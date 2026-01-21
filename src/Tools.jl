@@ -341,7 +341,7 @@ function calculate_grid(
 
     # Print buffer info
     lpoints = findmin(abs.(z .- lower_bufferlength))[2]
-    upoints = length(z) - findmin(abs.(z .- upper_bufferlength))[2]
+    upoints = length(z) - findmin(abs.(z .- (z[end]-upper_bufferlength)))[2]
     println("   Lower buffer length: $(z[lpoints])")
     println("   Points=$lpoints")
     println("   Upper buffer length: $(z[end-upoints])")
