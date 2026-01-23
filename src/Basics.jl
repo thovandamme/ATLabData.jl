@@ -5,8 +5,8 @@ import Base: +, -, *, /, ^, size, display, abs, convert, deepcopy, eltype
 
 using ..DataStructures
 
-export size, display, +, -, *, /, ^, abs, log, view, convert, eltype
-export crop, logarithm
+export size, display, +, -, *, /, ^, abs, log, view, convert, eltype, logarithm
+export crop
 export component
 export rms, average, mean, flucs
 
@@ -341,7 +341,7 @@ function component(data::VectorData, field::Symbol)::ScalarData
 end
 
 
-function crop(
+function _crop(
         data::ScalarData; 
         xmin = data.grid.x[1], xmax = data.grid.x[end], 
         ymin = data.grid.y[1], ymax = data.grid.y[end],
@@ -431,7 +431,7 @@ function crop(
 end
 
 
-function _crop(
+function crop(
         data::ScalarData;
         xmin = data.grid.x[1], xmax = data.grid.x[end], 
         ymin = data.grid.y[1], ymax = data.grid.y[end],
@@ -443,16 +443,16 @@ function _crop(
     imax = findmin(abs.(data.grid.x .- xmax))[2]
     jmin = findmin(abs.(data.grid.y .- ymin))[2]
     jmax = findmin(abs.(data.grid.y .- ymax))[2]
-    kmin = findmin(abs.(data.grid.k .- zmin))[2]
-    kmax = findmin(abs.(data.grid.k .- zmax))[2]
+    kmin = findmin(abs.(data.grid.z .- zmin))[2]
+    kmax = findmin(abs.(data.grid.z .- zmax))[2]
     return ScalarData(
         "crop($(data.name))",
         Grid{eltype(data)[1], eltype(data)[2]}(
             imax + 1 - imin,
             jmax + 1 - jmin,
             kmax + 1 - kmin,
-            data.grid.x[imax+1] - data.grid.x[imin],
-            data.grid.y[jmax+1] - data.grid.y[jmin],
+            data.grid.x[imax] - data.grid.x[imin],
+            data.grid.y[jmax] - data.grid.y[jmin],
             data.grid.z[kmax] - data.grid.z[kmin],
             data.grid.x[imin:imax],
             data.grid.y[jmin:jmax],

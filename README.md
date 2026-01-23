@@ -5,8 +5,9 @@ Julia package for loading and handling data from the
 
 
 ## Loading data
-Loading is done by _load_, which consists of methods for loading data from visuals.x and raw dns.x output:
+Loading is done by _load_, which consists of methods for loading data from visuals.x dns.x, and averages.x output:
 ```
+using ATLData
 visuals_data = load("path/to/dir/Buoyancy000000")
 raw_data = load("path/to/dir/scal.000000.1")
 ```
@@ -19,32 +20,33 @@ vector_data = load(
     "path/to/dir/flow.000000.3",
 )
 ```
-
+NetCDF data containing the horizontal averages:
+```
+var = "Eps"
+avg_data = load("/path/to/avgfile", var)
+```
 The _grid_ file (inigrid.x) has to be present in the same directory.
 
+One can also initialize an empty container from a grid and then use _load!_ 
+to write data to that container:
+```
+grid = loadgrid("/path/to/gridfile")
+data = init(grid)
+load!("/path/to/file")
+```
+
+The grid can also separately be loaded wiht _loadgrid_:
+```
+grid = loadgrid("/path/to/gridfile")
+```
 
 ## Data structure
-
-### Grid
-Composite type containing the grid information.  
-Attributes are:  
-- nx (grid points)
-- nx (grid points)
-- nz (grid points)
-- x (x-axis vector)
-- y (y-axis vector)
-- z (z-axis vector)
-- scalex (x-axis length)
-- scaley (y-axis length)
-- scalez (z-axis length)
-
-
-### ScalarData
-Composite type returned by _load_ with in single String argument.
-
-### VectorData
-Composite type returned by _load_ with three String arguments.
-
+Composite types:
+- _Grid_ for data from the gridfile
+- _ScalarData_ for data from visuals.x and dns.x output
+- _VectorData_ combining three scalar outputs from visuals.x or dns.x - not really
+used so far in the package.
+- _AveragesData_ for loading the NetCDF output from averages.x
 
 ## Handling data
 Standard operations are overloaded for _ScalarData_ and _VectorData_:

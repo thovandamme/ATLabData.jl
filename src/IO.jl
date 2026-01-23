@@ -34,10 +34,18 @@ type _VectorData_.
 Load the data contained in the path _file_ into the type _AveragesData_.
 _file_ has to be NetCDF file containing the averages from _average.x_.
 """
-global load(file::String; prec::Type=Float64)::ScalarData = _ScalarData_from_file(file, prec)
-global load(dir::String, field::String, time::Real; component::String=".0")::ScalarData = load(_file_for_time(dir, time, field, component))
-global load(xfile::String, yfile::String, zfile::String; prec::Type=Float64)::VectorData = _VectorData_from_files(xfile, yfile, zfile, prec)
-global load(file::String, var::String)::AveragesData = AveragesData_from_NetCDF(file, var)
+global load(
+    file::String; prec::Type=Float32
+)::ScalarData = _ScalarData_from_file(file, prec)
+global load(
+    dir::String, field::String, time::Real; component::String=".0"
+)::ScalarData = load(_file_for_time(dir, time, field, component))
+global load(
+    xfile::String, yfile::String, zfile::String; prec::Type=Float32
+)::VectorData = _VectorData_from_files(xfile, yfile, zfile, prec)
+global load(
+    file::String, var::String
+)::AveragesData = AveragesData_from_NetCDF(file, var)
 
 
 """
@@ -45,7 +53,9 @@ global load(file::String, var::String)::AveragesData = AveragesData_from_NetCDF(
 Version of _load_ for preallocated data container. This function does not 
     update the grid attribute!
 """
-global load!(data::ScalarData, file::String) = _ScalarData_from_file!(data, file)
+global load!(
+    data::ScalarData, file::String; prec=Float32
+) = _ScalarData_from_file!(data, file)
 global load!(
     data::VectorData, 
     xfile::String, yfile::String, zfile::String
@@ -175,23 +185,21 @@ function _ScalarData_from_visuals(fieldfile::String)::ScalarData{Float32, Int32}
 end
 
 
+# TODO add prec argument to load scal and flow with Float32
 function _ScalarData_from_file!(data::ScalarData, fieldfile::String)
     filename = split(fieldfile, "/")[end]
-    if eltype(data)[1]==Float64 && !(startswith(filename, "flow.") || startswith(filename, "scal."))
-        error(
-            "_data_ is initialized with type $(eltype(data)[1]) but $filename 
-            contains floats of type Float32"
-        )
-    elseif eltype(data)[1]==Float32 && (startswith(filename, "flow.") || startswith(filename, "scal."))
-        error(
-            "_data_ is initialized with type $(eltype(data)[1]) but $filename 
-            contains floats of type Float64"
-        )
-    end
     verbose("ScalarData", fieldfile)
     data.name = filename
     if startswith(filename, "flow.") || startswith(filename, "scal.")
-        data.field, data.time = _Array_from_rawfile(data.grid, fieldfile)
+        try
+            data.field, data.time = _Array_from_rawfile(data.grid, fieldfile)
+        catch e
+            println("Got $e")
+            println(
+                "Did you initialize the container with the same floating 
+                point precission as in the file?"
+            )
+        end
     else
         data.time = _time_from_file(fieldfile)
         data.field .= _Array_from_file(data.grid, fieldfile)
@@ -265,23 +273,20 @@ function _VectorData_from_files!(
         zfieldfile::String
     )
     filename = split(xfieldfile, "/")[end]
-    if eltype(data)[1]==Float64 && !(startswith(filename, "flow.") || startswith(filename, "scal."))
-        error(
-            "_data_ is initialized with type $(eltype(data)[1]) but $filename 
-            contains floats of type Float32"
-        )
-    elseif eltype(data)[1]==Float32 && (startswith(filename, "flow.") || startswith(filename, "scal."))
-        error(
-            "_data_ is initialized with type $(eltype(data)[1]) but $filename 
-            contains floats of type Float64"
-        )
-    end
     verbose("VectorData", xfieldfile, yfieldfile, zfieldfile)
     data.name = string(splitpath(xfieldfile)[end][1:end-2])
     if startswith(filename, "flow.") || startswith(filename, "scal.")
-        data.xfield, data.time = _Array_from_rawfile(data.grid, xfieldfile)
-        data.yfield .= _Array_from_rawfile(data.grid, yfieldfile)[1]
-        data.zfield .= _Array_from_rawfile(data.grid, zfieldfile)[1]
+        try 
+            data.xfield, data.time = _Array_from_rawfile(data.grid, xfieldfile)
+            data.yfield .= _Array_from_rawfile(data.grid, yfieldfile)[1]
+            data.zfield .= _Array_from_rawfile(data.grid, zfieldfile)[1]
+        catch e
+            prinlnt("$e")
+            println(
+                "Did you initialize the container with the same floating 
+                point precission as in the file?"
+            )
+        end
     else
         data.time = _time_from_file(fieldfile)
         data.xfield .= _Array_from_file(data.grid, xfieldfile)

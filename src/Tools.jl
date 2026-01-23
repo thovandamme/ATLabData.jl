@@ -155,7 +155,7 @@ end
 Shift the grid of _data_ by _shift_ along _axis_, i.e. each point of _axis_ is 
 added by _shift_.
 """
-function shiftgrid!(data::ScalarData, shift::AbstractFloat; axis::Symbol=:z)
+function shiftgrid!(data::AbstractData, shift::AbstractFloat; axis::Symbol=:z)
     if axis==:z
         data.grid.z .= data.grid.z .+ shift
     elseif axis==:y
@@ -524,6 +524,50 @@ function to_single_precision(
             write(ostream, convert(Vector{Float32}, field))
         end
     end
+end
+
+
+"""
+    filefilter(filenames, field, startstep, stopstep, component) -> Vector{String}
+Takes the Vector{String} _filenames_ and filters it by _field_, _startstep_, 
+_stopstep_ and _component_. _component_ represents the filename ending, e.g. 
+".1" ind "flow.1000.1". _field_ is in that case "flow.".
+"""
+function filefilter(
+        filenames::Vector{String}, 
+        field::String, 
+        startstep::Int, stopstep::Int, 
+        component::String
+    )::Vector{String}
+    filter!(x -> startswith(x, field), filenames)
+    excludes = ("bcs", "ics", "rand")
+    for excl ∈ excludes
+        filter!(x -> !contains(x, excl), filenames)
+    end
+    if component != ".0"
+        filter!(x -> endswith(x, component), filenames)
+    end
+    gtstartstep(filename::String, startstep::Int, field::String)::Bool = begin
+        stepstring = split(split(filename, field)[2], ".")[1]
+        stepint = parse(Int, stepstring)
+        if stepint >= startstep
+            return true
+        else
+            return false
+        end
+    end
+    ltstopstep(filename::String, stopstep::Int, field::String)::Bool = begin
+        stepstring = split(split(filename, field)[2], ".")[1]
+        stepint = parse(Int, stepstring)
+        if stepint <= stopstep
+            return true
+        else
+            return false
+        end
+    end
+    filter!(x -> gtstartstep(x, startstep, field), filenames)
+    filter(x -> ltstopstep(x, stopstep, field), filenames)
+    sort(files)
 end
 
 
