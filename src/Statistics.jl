@@ -82,26 +82,26 @@ end
 """
 Computes the mean field and returns it in same dimensions as data.
 """
-function mean(data::VectorData)::VectorData
-    resx = zeros(eltype(data.xfield), size(data.xfield))
-    resy = zeros(eltype(data.yfield), size(data.yfield))
-    resz = zeros(eltype(data.zfield), size(data.zfield))
-    for k ∈ 1:data.grid.nz
-        resx[:,:,k] .= sum(view(data.xfield, :, :, k))./(data.grid.nx*data.grid.ny)
-        resy[:,:,k] .= sum(view(data.yfield, :, :, k))./(data.grid.nx*data.grid.ny)
-        resz[:,:,k] .= sum(view(data.zfield, :, :, k))./(data.grid.nx*data.grid.ny)
-    end
-    return VectorData("mean($(data.name))", data.grid, data.time, resx, resy, resz)
-end
+# function mean(data::VectorData)::VectorData
+#     resx = zeros(eltype(data.field), size(data.xfield))
+#     resy = zeros(eltype(data.field), size(data.yfield))
+#     resz = zeros(eltype(data.field), size(data.zfield))
+#     for k ∈ 1:data.grid.nz
+#         resx[:,:,k] .= sum(view(data.xfield, :, :, k))./(data.grid.nx*data.grid.ny)
+#         resy[:,:,k] .= sum(view(data.yfield, :, :, k))./(data.grid.nx*data.grid.ny)
+#         resz[:,:,k] .= sum(view(data.zfield, :, :, k))./(data.grid.nx*data.grid.ny)
+#     end
+#     return VectorData("mean($(data.name))", data.grid, data.time, resx, resy, resz)
+# end
 
-function mean!(data::VectorData)::VectorData
-    for k ∈ 1:data.grid.nz
-        data.xfield[:,:,k] .= sum(view(data.xfield, :, :, k))./(data.grid.nx*data.grid.ny)
-        data.yfield[:,:,k] .= sum(view(data.yfield, :, :, k))./(data.grid.nx*data.grid.ny)
-        data.zfield[:,:,k] .= sum(view(data.zfield, :, :, k))./(data.grid.nx*data.grid.ny)
-    end
-    return data
-end
+# function mean!(data::VectorData)::VectorData
+#     for k ∈ 1:data.grid.nz
+#         data.xfield[:,:,k] .= sum(view(data.xfield, :, :, k))./(data.grid.nx*data.grid.ny)
+#         data.yfield[:,:,k] .= sum(view(data.yfield, :, :, k))./(data.grid.nx*data.grid.ny)
+#         data.zfield[:,:,k] .= sum(view(data.zfield, :, :, k))./(data.grid.nx*data.grid.ny)
+#     end
+#     return data
+# end
 
 function mean(data::ScalarData)::ScalarData
     res = zeros(eltype(data.field), size(data.field))
@@ -140,20 +140,23 @@ end
 
 function flucs!(data::VectorData)
     for k ∈ 1:data.grid.nz
-        data.xfield[:,:,k] .-= sum(view(data.xfield, :, :, k))./(data.grid.nx*data.grid.ny)
-        data.yfield[:,:,k] .-= sum(view(data.yfield, :, :, k))./(data.grid.nx*data.grid.ny)
-        data.zfield[:,:,k] .-= sum(view(data.zfield, :, :, k))./(data.grid.nx*data.grid.ny)
+        # data.field[1,:,:,k] .-= sum(view(data.field, 1, :, :, k))./(data.grid.nx*data.grid.ny)
+        # data.field[2,:,:,k] .-= sum(view(data.field, 2, :, :, k))./(data.grid.nx*data.grid.ny)
+        # data.field[3,:,:,k] .-= sum(view(data.field, 3, :, :, k))./(data.grid.nx*data.grid.ny)
+        for h ∈ eachindex(data.field[:,1,1,1])
+            data.field[h,:,:,k] .-= sum(view(data.field, h, :, :, k))./(data.grid.nx*data.grid.ny)
+        end
     end
     data.name = "flucs($(data.name))"
 end
 
 function flucs!(res::VectorData, data::VectorData)
-    for k ∈ 1:data.grid.nz
-        res.xfield[:,:,k] .-= sum(view(data.xfield, :, :, k))./(data.grid.nx*data.grid.ny)
-        res.yfield[:,:,k] .-= sum(view(data.yfield, :, :, k))./(data.grid.nx*data.grid.ny)
-        res.zfield[:,:,k] .-= sum(view(data.zfield, :, :, k))./(data.grid.nx*data.grid.ny)
+    for k ∈ eachindex(res.grid.z)
+        for h ∈ eachindex(res.field[:,1,1,1])
+            res.field[h,:,:,k] .-= sum(view(data.field, h, :, :, k))./(data.grid.nx*data.grid.ny)
+        end
     end
-    data.name = "flucs($(data.name))"
+    res.name = "flucs($(data.name))"
 end
 
 

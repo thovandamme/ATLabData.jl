@@ -237,14 +237,15 @@ function _VectorData_from_raw(
         T::Type
     )::VectorData{T, Int32}
     grid = convert(T,_Grid_from_file(dirname(xfieldfile)))
-    buffer, t = _Array_from_rawfile(grid, xfieldfile)
+    field = Array{T}(undef, 4, grid.nx, grid.ny, grid.nz)
+    field[1,:,:,:], t .= _Array_from_rawfile(grid, xfieldfile)
+    field[2,:,:,:] .= _Array_from_rawfile(grid, yfieldfile)[1]
+    field[3,:,:,:] .= _Array_from_rawfile(grid, zfieldfile)[1]
     return VectorData(
         name = string(splitpath(xfieldfile)[end][1:end-2]),
         grid = grid,
         time = t,
-        xfield = buffer,
-        yfield = _Array_from_rawfile(grid, yfieldfile)[1],
-        zfield = _Array_from_rawfile(grid, zfieldfile)[1]
+        field = field
     )
 end
 
@@ -255,13 +256,15 @@ function _VectorData_from_visuals(
         zfieldfile::String
     )
     grid = convert(Float32, _Grid_from_file(dirname(xfieldfile)))
+    field = Array{T}(undef, 4, grid.nx, grid.ny, grid.nz)
+    field[1,:,:,:] .= _Array_from_file(grid, xfieldfile)
+    field[2,:,:,:] .= _Array_from_file(grid, yfieldfile)
+    field[3,:,:,:] .= _Array_from_file(grid, zfieldfile)
     return VectorData(
         name = string(splitpath(xfieldfile)[end][1:end-2]),
         grid = grid,
         time = _time_from_file(xfieldfile),
-        xfield = _Array_from_file(grid, xfieldfile),
-        yfield = _Array_from_file(grid, yfieldfile),
-        zfield = _Array_from_file(grid, zfieldfile)
+        field = field
     )
 end
 
@@ -277,9 +280,9 @@ function _VectorData_from_files!(
     data.name = string(splitpath(xfieldfile)[end][1:end-2])
     if startswith(filename, "flow.") || startswith(filename, "scal.")
         try 
-            data.xfield, data.time = _Array_from_rawfile(data.grid, xfieldfile)
-            data.yfield .= _Array_from_rawfile(data.grid, yfieldfile)[1]
-            data.zfield .= _Array_from_rawfile(data.grid, zfieldfile)[1]
+            data.field[1,:,:,:], data.time = _Array_from_rawfile(data.grid, xfieldfile)
+            data.field[2,:,:,:] .= _Array_from_rawfile(data.grid, yfieldfile)[1]
+            data.field[3,:,:,:] .= _Array_from_rawfile(data.grid, zfieldfile)[1]
         catch e
             prinlnt("$e")
             println(
@@ -289,9 +292,9 @@ function _VectorData_from_files!(
         end
     else
         data.time = _time_from_file(fieldfile)
-        data.xfield .= _Array_from_file(data.grid, xfieldfile)
-        data.yfield .= _Array_from_file(data.grid, yfieldfile)
-        data.zfield .= _Array_from_file(data.grid, zfieldfile)
+        data.field[1,:,:,:] .= _Array_from_file(data.grid, xfieldfile)
+        data.field[2,:,:,:] .= _Array_from_file(data.grid, yfieldfile)
+        data.field[3,:,:,:] .= _Array_from_file(data.grid, zfieldfile)
     end
     return nothing
 end

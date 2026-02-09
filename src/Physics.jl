@@ -89,7 +89,7 @@ function tke(data::VectorData)::ScalarData
         "tke($(data.name))", 
         data.grid, 
         data.time,
-        0.5f0 .* (buffer.xfield.^2 .+ buffer.yfield.^2 .+ buffer.zfield.^2)
+        0.5f0 .* (buffer.field[1,:,:,:].^2 .+ buffer.field[2,:,:,:].^2 .+ buffer.field[3,:,:,:].^2)
     )
 end
 

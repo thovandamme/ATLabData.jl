@@ -43,16 +43,21 @@ mutable struct VectorData{T,I} <: AbstractData{T,I}
     name::String
     grid::Grid{T,I}
     time::T
-    xfield::Array{T,3}
-    yfield::Array{T,3}
-    zfield::Array{T,3}
+    field::Array{T,4}
 end
 VectorData(;
-    name::String, grid::Grid, time::AbstractFloat, 
-    xfield::Array{<:AbstractFloat,3}, 
-    yfield::Array{<:AbstractFloat,3}, 
-    zfield::Array{<:AbstractFloat,3},
-) = VectorData(name, grid, time, xfield, yfield, zfield)
+    name::String, grid::Grid, time::AbstractFloat, field::Array{<:AbstractFloat, 4}
+) = VectorData(name, grid, time, field)
+# VectorData(;
+#     name::String, grid::Grid, time::AbstractFloat, 
+#     xfield::Array{<:AbstractFloat,3}, 
+#     yfield::Array{<:AbstractFloat,3}, 
+#     zfield::Array{<:AbstractFloat,3},
+# ) = begin
+
+#     return 
+# end
+
 
 
 mutable struct AveragesData{T,I} <: AbstractData{T,I}

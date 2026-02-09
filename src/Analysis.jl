@@ -16,6 +16,7 @@ _order_ determines the numerical error order for the derivatives.
 global function gradient(
         data::ScalarData{T,I}
     )::VectorData{T,I} where {T<:AbstractFloat, I<:Signed}
+    println("Calculating gradient with $(Threads.nthreads()) threads.")
     res = Array{T}(undef, 3, data.grid.nx, data.grid.ny, data.grid.nz)
     if data.grid.ny > 1
         gradient3D!(res, data)
@@ -26,27 +27,25 @@ global function gradient(
         name = "∇($(data.name))",
         grid = data.grid,
         time = data.time,
-        xfield = res[1,:,:,:],
-        yfield = res[2,:,:,:],
-        zfield = res[3,:,:,:]
+        field = res
     )
 end
 
 
-# global function gradient!(
-#         res::VectorData{T,I},
-#         data::ScalarData{T,I}
-#     )::VectorData{T,I} where {T<:AbstractFloat, I<:Signed}
-#     if data.grid.ny > 1
-#         gradient3D!(res.field, data)
-#     else
-#         gradient2D!(res.field, data)
-#     end
-#     return nothing
-# end
+global function gradient!(
+        res::VectorData{T,I},
+        data::ScalarData{T,I}
+    )::VectorData{T,I} where {T<:AbstractFloat, I<:Signed}
+    if data.grid.ny > 1
+        gradient3D!(res.field, data)
+    else
+        gradient2D!(res.field, data)
+    end
+    return nothing
+end
 
 
-function gradien3D!(
+function gradient3D!(
         res::Array{T}, data::ScalarData{T,I}
     ) where {T<:AbstractFloat, I<:Signed}
     @inbounds @threads for k ∈ eachindex(data.grid.z)
@@ -92,7 +91,7 @@ function gradien3D!(
 end
 
 
-function gradien2D!(
+function gradient2D!(
         res::Array{T}, data::ScalarData{T,I}
     ) where {T<:AbstractFloat, I<:Signed}
     @inbounds @threads for k ∈ eachindex(data.grid.z)

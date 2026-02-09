@@ -1,7 +1,7 @@
 module Basics
 
 
-import Base: +, -, *, /, ^, size, display, abs, convert, deepcopy, eltype
+import Base: +, -, *, /, ^, size, display, abs, convert, deepcopy, eltype, sqrt
 
 using ..DataStructures
 
@@ -15,9 +15,7 @@ export rms, average, mean, flucs
     size(data)
 Returns `sìze(data.field)`.
 """
-size(data::ScalarData)::Tuple = size(data.field)
-size(data::VectorData)::Tuple = (size(data.xfield), size(data.yfield), size(data.zfield))
-size(data::AveragesData)::Tuple = size(data.field)
+size(data::AbstractData) = size(data.field)
 
 
 """
@@ -35,9 +33,7 @@ Does the same as '''subtract(data1, data2)'''
     name = "$(data1.name)-$(data2.name)",
     grid = data1.grid,
     time = data1.time,
-    xfield = data1.xfield .- data2.xfield,
-    yfield = data1.yfield .- data2.yfield,
-    zfield = data1.zfield .- data2.zfield
+    field = data1.field .- data2.field
 )
 -(data1::AveragesData, data2::AveragesData)::AveragesData = AveragesData(
     name = "$(data1.name)-$(data2.name)",
@@ -45,6 +41,12 @@ Does the same as '''subtract(data1, data2)'''
     z = data1.grid.z,
     field = data1.field .- data2.field
 )
+# -(data1::T, data2::T) where {T<:AbstractData} = T(
+#     name = "$(data1.name)-$(data2.name)",
+#     time = data1.time,
+#     grid = data1.grid,
+#     field = data1.field .- data2.field,
+# )
 
 
 """
@@ -61,9 +63,7 @@ Add the _fields_ of _data1_ and _data2_. Does the same as '''add(data1, data2)''
     name = data1.name * "+" * data2.name,
     grid = data1.grid,
     time = data1.time,
-    xfield = data1.xfield .+ data2.xfield,
-    yfield = data1.yfield .+ data2.yfield,
-    zfield = data1.zfield .+ data2.zfield
+    field = data1.field .- data2.field
 )
 +(data1::AveragesData, data2::AveragesData)::AveragesData = AveragesData(
     name = "$(data1.name)+$(data2.name)",
@@ -84,22 +84,22 @@ Vectorized multiplication of the fields of _data1_ and _data2_
     name = data.name,
     time = data.time,
     grid = data.grid,
-    field = data.field .* convert(Float32, factor)
+    field = data.field .* convert(eltype(data.time), factor)
 )
 *(data::VectorData, factor::Real)::VectorData = VectorData(
     name = data.name,
     time = data.time,
     grid = data.grid,
-    xfield = data.xfield * convert(Float32, factor),
-    yfield = data.yfield * convert(Float32, factor),
-    zfield = data.zfield * convert(Float32, factor)
+    field = data.field .* convert(eltype(data.time), factor)
 )
 *(data::AveragesData, factor::Real)::AveragesData = AveragesData(
     name = data.name,
     time = data.time,
     z = data.grid.z,
-    field = data.field .* convert(Float32, factor)
+    field = data.field .* convert(eltype(data.time), factor)
 )
+*(factor::Real, data::AbstractData)::AbstractData = data*factor
+
 *(data1::ScalarData, data2::ScalarData)::ScalarData = ScalarData(
     name = "$(data1.name)*$(data2.name)",
     time = data1.time,
@@ -112,7 +112,6 @@ Vectorized multiplication of the fields of _data1_ and _data2_
     z = data1.grid.z,
     field = data1.field .* data2.field
 )
-*(factor::Real, data::AbstractData)::AbstractData = data*factor
 
 
 """
@@ -122,25 +121,23 @@ Divide the _field_ of _data_ with _number__.
     data1 / data2
 Vectorized division of the fields of _data1_ and _data2_.
 """
-/(data::ScalarData, factor::Real)::ScalarData = ScalarData(
+/(data::ScalarData, factor::Real)::ScalarData where{T<:AbstractFloat, I<:Signed} = ScalarData(
     name = data.name,
     time = data.time,
     grid = data.grid,
-    field = data.field ./ convert(Float32, factor)
+    field = data.field ./ convert(eltype(data.time), factor)
 )
-/(data::VectorData, factor::Real)::VectorData = VectorData(
+/(data::VectorData, factor::Real)::VectorData where{T<:AbstractFloat, I<:Signed} = VectorData(
     name = data.name,
     time = data.time,
     grid = data.grid,
-    xfield = data.xfield ./ convert(Float32, factor),
-    yfield = data.yfield ./ convert(Float32, factor),
-    zfield = data.zfield ./ convert(Float32, factor)
+    field = data.field ./ convert(eltype(data.time), factor)
 )
-/(data::AveragesData, factor::Real)::AveragesData = AveragesData(
+/(data::AveragesData, factor::Real)::AveragesData where{T<:AbstractFloat, I<:Signed} = AveragesData(
     name = data.name,
     time = data.time,
     z = data.grid.z,
-    field = data.field ./ convert(Float32, factor)
+    field = data.field ./ convert(eltype(data.time), factor)
 )
 /(data1::ScalarData, data2::ScalarData)::ScalarData = ScalarData(
     name = "$(data1.name)*$(data2.name)",
@@ -165,13 +162,13 @@ maintaining the metadata.
     name = data.name, 
     time = data.time, 
     grid = data.grid,
-    field = data.field.^exponent
+    field = data.field.^convert(eltype(data.time), exponent)
 )
 ^(data::AveragesData, exponent::Real)::AveragesData = AveragesData(
     name = data.name, 
     time = data.time, 
     z = data.grid.z,
-    field = data.field.^exponent
+    field = data.field.^convert(eltype(data.time), exponent)
 )
 
 
@@ -188,7 +185,7 @@ abs(data::ScalarData) = ScalarData(
 )
 abs(data::VectorData) = norm(data)
 norm(data::VectorData)::ScalarData = ScalarData(
-    field = sqrt.(data.xfield.^2 .+ data.yfield.^2 .+ data.zfield.^2),
+    field = sqrt.(data.field[1,:,:,:].^2 .+ data.field[2,:,:,:].^2 .+ data.field[3,:,:,:].^2),
     grid = data.grid,
     name = "abs(" * data.name * ")",
     time = data.time
@@ -243,7 +240,7 @@ convert(T::Type{<:AbstractFloat}, data::ScalarData)::ScalarData{T,Int32} = Scala
     data.name, convert(T, data.grid), data.time, data.field
 )
 convert(T::Type{<:AbstractFloat}, data::VectorData)::VectorData{T,Int32} = VectorData{T,Int32}(
-    data.name, convert(T, data.grid), data.time, data.xfield, data.yfield, data.zfield
+    data.name, convert(T, data.grid), data.time, data.field
 )
 
 
@@ -278,32 +275,13 @@ function display(data::Grid)
     print("   y: "); println(typeof(data.y))
     print("   z: "); println(typeof(data.z))
 end
-function display(data::ScalarData)
-    println(typeof(data), " with attributes: ")
-    print("   name: "); println(data.name)
-    print("   grid: "); println(typeof(data.grid))
-    print("   field: "); println(typeof(data.field))
-    print("   time: "); println(data.time)
-    println("   Use display(data.grid) and display(data.field) to print the corresponding attributes")
+function display(data::AbstractData)
+    println("$(typeof(data)):")
+    print("    name: "); println(data.name)
+    print("    grid: "); println(typeof(data.grid))
+    print("    field: "); println(typeof(data.field))
+    print("    time: "); println(data.time)
 end
-function display(data::VectorData)
-    println(typeof(data), " with attributes: ")
-    print("   name: "); println(data.name)
-    print("   grid: "); println(typeof(data.grid))
-    print("   xfield: "); println(typeof(data.xfield))
-    print("   yfield: "); println(typeof(data.yfield))
-    print("   zfield: "); println(typeof(data.zfield))
-    print("   time: "); println(data.time)
-    println("   Use display(data.grid) and display(data.*field) to print the corresponding attributes")
-end
-function display(data::AveragesData)
-    println(typeof(data), " with attributes: ")
-    print("   name: "); println(data.name)
-    print("   z: "); println(typeof(data.grid.z))
-    print("   field: "); println(typeof(data.field))
-    print("   time: "); println(data.time)
-end
-
 
 # ------------------------------------------------------------------------------
 # -------------------- Additional operations -----------------------------------
@@ -319,21 +297,21 @@ function component(data::VectorData, field::Symbol)::ScalarData
             name = data.name * " - "*string(field),
             time = data.time,
             grid = data.grid,
-            field = data.xfield
+            field = data.field[1,:,:,:]
         )
     elseif field == :y
         return ScalarData(
             name = data.name * " - "*string(field),
             time = data.time,
             grid = data.grid,
-            field = data.yfield
+            field = data.field[2,:,:,:]
         )
     elseif field == :z
         return ScalarData(
             name = data.name * " - "*string(field),
             time = data.time,
             grid = data.grid,
-            field = data.zfield
+            field = data.field[3,:,:,:]
         )
     else
         error("Choose the x, y, or z component of the VectorData")
