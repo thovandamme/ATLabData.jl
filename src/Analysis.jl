@@ -1,131 +1,29 @@
 module Analysis
 
-
 using ..DataStructures
-
 using Base.Threads
-using Interpolations: interpolate, Gridded, Linear, Constant, NoInterp
-using FiniteDifferences: central_fdm, grad
-
 
 export gradient, curl
 
 
+let
 """
     gradient(data; order=4)
 Return the gradient of _data_ by using the packages _FiniteDifferences_  and 
 _Iterpolations_.  
 _order_ determines the numerical error order for the derivatives.
 """
-# function gradient(data::ScalarData; order::Int=4)::VectorData
-#     # TODO: 3D, faster?, parallise
-#     println("Calculating gradient with $(nthreads()) threads...")
-#     printstyled("    "*data.name*"\n", color=:cyan)
-#     return gradient_multi_thread(data, order)
-#     # return VectorData(
-#     #     name = "gradient(" * data.name * ")",
-#     #     grid = data.grid,
-#     #     time = data.time,
-#     #     xfield = res[1,:,:,:],
-#     #     yfield = res[2,:,:,:],
-#     #     zfield = res[3,:,:,:]
-#     # )
-# end
-
-
-function gradient_single_thread!(
-        res::Array{T}, data::ScalarData{T,I}, itp, order::Int, ichunk::UnitRange
-    )::Array{T} where {T<:AbstractFloat, I<:Signed}
-    println("Process $(threadid()) in gradient_single_thread")
-    k = 1
-    if ichunk[1]==1
-        iminoffset = round(Int, order/2+2)
-    else
-        iminoffset = 0
-    end
-    if ichunk[end]==data.grid.nx
-        imaxoffset = round(Int, order/2+2)
-    else
-        imaxoffset = 0
-    end
-    for k ∈ round(Int, order/2+2):round(Int, data.grid.nz - order/2-2)
-        for j ∈ 1:data.grid.ny
-            for i ∈ round(Int, ichunk[1]+iminoffset):round(Int, ichunk[end] - imaxoffset)
-                buffer = grad(central_fdm(order, 1), itp, data.grid.x[i], data.grid.z[k])
-                # buffer = grad(central_fdm(order, 1), itp, i, k)
-                res[1,i,j,k] = buffer[1]
-                res[2,i,j,k] = 0.0
-                res[3,i,j,k] = buffer[2]
-            end
-        end
-    end
-    return res
-end
-
-
-function gradient_single_thread(
-        data::ScalarData{T,I}, itp, order::Int, ichunk::UnitRange
-    )::Array{T} where {T<:AbstractFloat, I<:Signed}
-    println("Process $(threadid()) in gradient_single_thread")
-    k = 1
-    if ichunk[1]==1
-        iminoffset = round(Int, order/2+2)
-    else
-        iminoffset = 0
-    end
-    if ichunk[end]==data.grid.nx
-        imaxoffset = round(Int, order/2+2)
-    else
-        imaxoffset = 0
-    end
-    res = Array{T}(undef, 3, length(ichunk), data.grid.ny, data.grid.nz)
-    for k ∈ round(Int, order/2+2):round(Int, data.grid.nz - order/2-2)
-        for j ∈ 1:data.grid.ny
-            for i ∈ round(Int, ichunk[1] + iminoffset):round(Int, ichunk[end] - imaxoffset)
-                buffer = grad(central_fdm(order, 1), itp, data.grid.x[i], data.grid.z[k])
-                # buffer = grad(central_fdm(order, 1), itp, i, k)
-                res[1,i-ichunk[1],j,k] = buffer[1]
-                res[2,i-ichunk[1],j,k] = 0.0
-                res[3,i-ichunk[1],j,k] = buffer[2]
-            end
-        end
-    end
-    return res
-end
-
-
-function gradient(
-        data::ScalarData{T,I}, order::Int
+global function gradient(
+        data::ScalarData{T,I}
     )::VectorData{T,I} where {T<:AbstractFloat, I<:Signed}
-    # TODO: 3D, faster?, parallise
-    println("Calculating gradient with $(nthreads()) threads...")
-    printstyled("    "*data.name*"\n", color=:cyan)
-    
     res = Array{T}(undef, 3, data.grid.nx, data.grid.ny, data.grid.nz)
-    k = 1
-    itp = interpolate(
-        (data.grid.x, data.grid.z), # Nodes of the grid
-        data.field[:,k,:], # Field to be interpolated
-        Gridded(Linear())
-    )
-    "Split the data  in chunks in the x-dimension"
-    xchunks = Iterators.partition(range(1, data.grid.nx), round(Int, data.grid.nx/nthreads()))
-    for xchunk in collect(xchunks)
-        @sync begin
-            @spawn begin
-                println("I am process $(threadid()) of $(nthreads())")
-                println("ichunk = $xchunk")
-
-                # gradient_single_thread!(res, data, itp, order, xchunk)
-                res[:,xchunk,:,:] .= gradient_single_thread(data, itp, order, xchunk)
-                
-                println("... process $(threadid()) of $(nthreads()) is done")
-            end
-        end
-    end
-
+    if data.grid.ny > 1
+        gradient3D!(res, data)
+    else
+        gradient2D!(res, data)
+    end    
     return VectorData(
-        name = "gradient(" * data.name * ")",
+        name = "∇($(data.name))",
         grid = data.grid,
         time = data.time,
         xfield = res[1,:,:,:],
@@ -133,6 +31,100 @@ function gradient(
         zfield = res[3,:,:,:]
     )
 end
+
+
+# global function gradient!(
+#         res::VectorData{T,I},
+#         data::ScalarData{T,I}
+#     )::VectorData{T,I} where {T<:AbstractFloat, I<:Signed}
+#     if data.grid.ny > 1
+#         gradient3D!(res.field, data)
+#     else
+#         gradient2D!(res.field, data)
+#     end
+#     return nothing
+# end
+
+
+function gradien3D!(
+        res::Array{T}, data::ScalarData{T,I}
+    ) where {T<:AbstractFloat, I<:Signed}
+    @inbounds @threads for k ∈ eachindex(data.grid.z)
+        for j ∈ eachindex(data.grid.y)
+            for i ∈ eachindex(data.grid.x)
+                # ∂/∂x
+                if i==1
+                    res[1,i,j,k] = data.field[i+1,j,k] - data.field[i,j,k]
+                    res[1,i,j,k] = res[1,i,j,k]/(data.grid.x[i+1] - data.grid.x[i])
+                elseif i==data.grid.nx
+                    res[1,i,j,k] = data.field[i,j,k] - data.field[i-1,j,k]
+                    res[1,i,j,k] = res[1,i,j,k]/(data.grid.x[i] - data.grid.x[i-1])
+                else
+                    res[1,i,j,k] = data.field[i+1,j,k] - data.field[i-1,j,k]
+                    res[1,i,j,k] = res[1,i,j,k]/(data.grid.x[i+1] - data.grid.x[i-1])
+                end
+                # ∂/∂y
+                if j==1
+                    res[2,i,j,k] = data.field[i,j+1,k] - data.field[i,j,k]
+                    res[2,i,j,k] = res[2,i,j,k]/(data.grid.y[j+1] - data.grid.y[j])
+                elseif j==data.grid.ny
+                    res[2,i,j,k] = data.field[i,j,k] - data.field[i,j-1,k]
+                    res[2,i,j,k] = res[2,i,j,k]/(data.grid.y[j] - data.grid.y[j-1])
+                else
+                    res[2,i,j,k] = data.field[i,j+1,k] - data.field[i,j-1,k]
+                    res[2,i,j,k] = res[2,i,j,k]/(data.grid.y[j+1] - data.grid.y[j-1])
+                end
+                # ∂/∂z
+                if k==1
+                    res[3,i,j,k] = data.field[i,j,k+1] - data.field[i,j,k]
+                    res[3,i,j,k] = res[2,i,j,k]/(data.grid.z[k+1] - data.grid.z[k])
+                elseif k==data.grid.nz
+                    res[3,i,j,k] = data.field[i,j,k] - data.field[i,j,k-1]
+                    res[3,i,j,k] = res[3,i,j,k]/(data.grid.z[k] - data.grid.z[k-1])
+                else
+                    res[3,i,j,k] = data.field[i,j,k+1] - data.field[i,j,k-1]
+                    res[3,i,j,k] = res[2,i,j,k]/(data.grid.z[k+1] - data.grid.z[k-1])
+                end
+            end
+        end
+    end
+    return nothing
+end
+
+
+function gradien2D!(
+        res::Array{T}, data::ScalarData{T,I}
+    ) where {T<:AbstractFloat, I<:Signed}
+    @inbounds @threads for k ∈ eachindex(data.grid.z)
+        for i ∈ eachindex(data.grid.x)
+            # ∂/∂x
+            if i==1
+                res[1,i,1,k] = data.field[i+1,1,k] - data.field[i,1,k]
+                res[1,i,1,k] = res[1,i,1,k]/(data.grid.x[i+1] - data.grid.x[i])
+            elseif i==data.grid.nx
+                res[1,i,1,k] = data.field[i,1,k] - data.field[i-1,1,k]
+                res[1,i,1,k] = res[1,i,1,k]/(data.grid.x[i] - data.grid.x[i-1])
+            else
+                res[1,i,1,k] = data.field[i+1,1,k] - data.field[i-1,1,k]
+                res[1,i,1,k] = res[1,i,1,k]/(data.grid.x[i+1] - data.grid.x[i-1])
+            end
+            # ∂/∂z
+            if k==1
+                res[3,i,1,k] = data.field[i,1,k+1] - data.field[i,1,k]
+                res[3,i,1,k] = res[2,i,1,k]/(data.grid.z[k+1] - data.grid.z[k])
+            elseif k==data.grid.nz
+                res[3,i,1,k] = data.field[i,1,k] - data.field[i,1,k-1]
+                res[3,i,1,k] = res[3,i,1,k]/(data.grid.z[k] - data.grid.z[k-1])
+            else
+                res[3,i,1,k] = data.field[i,1,k+1] - data.field[i,1,k-1]
+                res[3,i,1,k] = res[2,i,1,k]/(data.grid.z[k+1] - data.grid.z[k-1])
+            end
+        end
+    end
+    return nothing
+end
+
+end # end of let scope for gradient
 
 
 function curl(data::VectorData; order::Int=4)::VectorData
