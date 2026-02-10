@@ -3,10 +3,15 @@ module Analysis
 using ..DataStructures
 using Base.Threads
 
-export gradient, curl
+export gradient, gradient!, curl, curl!
 
 
 let
+verbose(type::String) = begin
+    println("Calculating $type with $(Threads.nthreads()) threads.")
+end
+
+
 """
     gradient(data; order=4)
 Return the gradient of _data_ by using the packages _FiniteDifferences_  and 
@@ -16,7 +21,7 @@ _order_ determines the numerical error order for the derivatives.
 global function gradient(
         data::ScalarData{T,I}
     )::VectorData{T,I} where {T<:AbstractFloat, I<:Signed}
-    println("Calculating gradient with $(Threads.nthreads()) threads.")
+    verbose("gradient")
     res = Array{T}(undef, 3, data.grid.nx, data.grid.ny, data.grid.nz)
     if data.grid.ny > 1
         gradient3D!(res, data)
@@ -36,11 +41,13 @@ global function gradient!(
         res::VectorData{T,I},
         data::ScalarData{T,I}
     )::VectorData{T,I} where {T<:AbstractFloat, I<:Signed}
+    verbose("gradient")
     if data.grid.ny > 1
         gradient3D!(res.field, data)
     else
         gradient2D!(res.field, data)
     end
+    res.name = "∇($(data.name))"
     return nothing
 end
 
@@ -123,69 +130,119 @@ function gradient2D!(
     return nothing
 end
 
-end # end of let scope for gradient
 
-
-function curl(data::VectorData; order::Int=4)::VectorData
-    # TODO: 3D, faster?, parallise
-    
-    println("Calculating curl ...")
-    printstyled("    "*data.name*"\n", color=:cyan)
-    
-    xres = zeros(Float32, (data.grid.nx, data.grid.ny, data.grid.nz))
-    yres = zeros(Float32, (data.grid.nx, data.grid.ny, data.grid.nz))
-    zres = zeros(Float32, (data.grid.nx, data.grid.ny, data.grid.nz))
-    
-    if data.grid.nz > 1
-        kmin = order÷2 + 1; kmax = data.grid.nz - order - 1
-    else
-        kmin = 1; kmax = data.grid.nz
-    end
+"""
+    curl(data)
+"""
+global function curl(data::VectorData{T,I})::VectorData{T,I} where {T<:AbstractFloat, I<:Signed}
+    verbose("curl")
+    res = Array{T}(undef, 3, data.grid.nx, data.grid.ny, data.grid.nz)
     if data.grid.ny > 1
-        jmin = order÷2 + 1; jmax = data.grid.ny - order - 1
+        curl3D!(res, data)
     else
-        jmin = 1; jmax = data.grid.ny
-    end
-    if data.grid.nx > 1
-        imin = order÷2 + 1; imax = data.grid.nx - order - 1
-    else
-        imin = 1; imax = data.grid.nx
-    end
-
-    """ Not the real curl: computes curl for each y-slice (2D) ... TODO """
-    for j ∈ jmin:jmax
-        xitp = interpolate(
-            (data.grid.x, data.grid.z), # Nodes of the grid
-            data.xfield[:,j,:], # Field to be interpolated
-            Gridded(Linear())
-        )
-        # yitp = interpolate(
-        #     (data.grid.x, data.grid.y), # Nodes of the grid
-        #     data.yfield[:,:,k], # Field to be interpolated
-        #     Gridded(Linear())
-        # )
-        zitp = interpolate(
-            (data.grid.x, data.grid.z), # Nodes of the grid
-            data.zfield[:,j,:], # Field to be interpolated
-            Gridded(Linear())
-        )
-        for k ∈ kmin:kmax
-            for i ∈ imin:imax
-                xgrad = grad(central_fdm(order, 1), xitp, data.grid.x[i], data.grid.z[k])
-                # ygrad = grad(central_fdm(order, 1), yitp, data.grid.x[i], data.grid.z[k])
-                zgrad = grad(central_fdm(order, 1), zitp, data.grid.x[i], data.grid.z[k])
-
-                # xres[i,j,k] = zgrad[2] - ygrad[3]
-                yres[i,j,k] = xgrad[3] - zgrad[1]
-                # zres[i,j,k] = ygrad[1] - xgrad[2]
-            end
-        end
-    end
+        curl2D!(res, data)
+    end    
     return VectorData(
-        name="curl($(data.name))", time=data.time, grid=data.grid,
-        xfield=xres, yfield=yres, zfield=zres
+        name = "∇×($(data.name))",
+        grid = data.grid,
+        time = data.time,
+        field = res
     )
 end
 
-    
+
+"""
+    curl!(res, data)
+Mutating variant fo curl(data). Stores result in preallocated VectorData res.
+"""
+global function curl!(res::VectorData{T,I}, data::VectorData{T,I}) where {T<:AbstractFloat, I<:Signed}
+    verbose("curl")
+    if data.grid.ny > 1
+        curl3D!(res.field, data)
+    else
+        curl2D!(res.field, data)
+    end
+    res.name = "∇×($(data.name))"
+    return nothing
+end
+
+
+function curl3D!(res::Array{T}, data::VectorData{T,I}) where {T<:AbstractFloat, I<:Signed}
+    # Setting the boundaries to zero for simplicity
+    res[:,1,:,:] .= 0.0
+    res[:,:,1,:] .= 0.0
+    res[:,:,:,1] .= 0.0
+    @inbounds @threads for k ∈ 2:data.grid.nz-1
+        ∂z = data.grid.z[k+1] - data.grid.z[k-1]
+        for j ∈ 2:data.grid.ny-1
+            ∂y = data.grid.y[j+1] - data.grid.y[j-1]
+            for i ∈ 2:data.grid.nx-1
+                ∂x = data.grid.x[i+1] - data.grid.x[i-1]
+
+                ∂1 = data.field[3,i,j+1,k] - data.field[3,i,j-1,k]
+                ∂2 = data.field[2,i,j,k+1] - data.field[2,i,j,k-1]
+                res[1,i,j,k] = ∂1/∂y - ∂2/∂z
+
+                ∂1 = data.field[1,i,j,k+1] - data.field[1,i,j,k-1]
+                ∂2 = data.field[3,i+1,j,k] - data.field[3,i-1,j,k]
+                res[2,i,j,k] = ∂1/∂z - ∂2/∂x
+
+                ∂1 = data.field[2,i+1,j,k] - data.field[2,i-1,j,k]
+                ∂2 = data.field[1,i,j+1,k] - data.field[1,i,j-1,k]
+                res[3,i,j,k] = ∂1/∂x - ∂2/∂y
+            end
+        end
+    end
+end
+
+
+# This method is much slower
+function _curl3D!(res::Array{T}, data::VectorData{T,I}) where {T<:AbstractFloat, I<:Signed} 
+    @inline function ∂(fieldk, dir, i, j, k)
+        dx = data.grid.x[i+1] - data.grid.x[i-1]
+        dy = data.grid.y[j+1] - data.grid.y[j-1]
+        dz = data.grid.z[k+1] - data.grid.z[k-1]
+        if dir == 1
+            return (fieldk[i+1,j,k] - fieldk[i-1,j,k]) / dx
+        elseif dir == 2
+            return (fieldk[i,j+1,k] - fieldk[i,j-1,k]) / dy
+        elseif dir == 3
+            return (fieldk[i,j,k+1] - fieldk[i,j,k-1]) / dz
+        else
+            error("field does not have this component")
+        end
+    end 
+    @inbounds @threads for k ∈ 2:data.grid.nz-1
+        for j ∈ 2:data.grid.ny-1
+            for i ∈ 2:data.grid.nx-1
+                for α ∈ 1:3 # curl index
+                    for β ∈ 1:3 # derivate index
+                        for γ ∈ 1:3 # field index 
+                            ε = levi_civita(α, β, γ)
+                            ε==0 && continue
+                            res[α,i,j,k] += ε*∂(
+                                view(data.field, γ, :, :, :), β, i, j, k
+                            )
+                        end
+                    end
+                end
+            end
+        end
+    end
+    return nothing
+end
+
+
+@inline function levi_civita(i::Int, j::Int, k::Int)
+    if i == j || j == k || i == k
+        return 0
+    elseif (i, j, k) in ((1,2,3), (2,3,1), (3,1,2))
+        return 1
+    else
+        return -1
+    end
+end
+end # end of let scope    
+
+
 end

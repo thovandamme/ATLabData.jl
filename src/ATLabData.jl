@@ -11,8 +11,6 @@ include("IO.jl")
 using .IO
     export load, load!, loadgrid
     export init
-    # To be removed from exports list
-    export file_for_time, Grid_from_file, VAR
 
 include("Basics.jl")
 using .Basics
@@ -22,7 +20,7 @@ using .Basics
 
 include("Analysis.jl")
 using .Analysis
-    export gradient, curl
+    export gradient, gradeint!, curl, curl!
 
 include("Statistics.jl")
 using .Statistics
