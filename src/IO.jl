@@ -238,7 +238,7 @@ function _VectorData_from_raw(
     )::VectorData{T, Int32}
     grid = convert(T,_Grid_from_file(dirname(xfieldfile)))
     field = Array{T}(undef, 4, grid.nx, grid.ny, grid.nz)
-    field[1,:,:,:], t .= _Array_from_rawfile(grid, xfieldfile)
+    field[1,:,:,:], t = _Array_from_rawfile(grid, xfieldfile)
     field[2,:,:,:] .= _Array_from_rawfile(grid, yfieldfile)[1]
     field[3,:,:,:] .= _Array_from_rawfile(grid, zfieldfile)[1]
     return VectorData(

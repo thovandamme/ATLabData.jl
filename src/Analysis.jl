@@ -2,6 +2,7 @@ module Analysis
 
 using ..DataStructures
 using Base.Threads
+using LoopVectorization
 
 export gradient, gradient!, curl, curl!
 
@@ -173,23 +174,23 @@ function curl3D!(res::Array{T}, data::VectorData{T,I}) where {T<:AbstractFloat, 
     res[:,:,1,:] .= 0.0
     res[:,:,:,1] .= 0.0
     @inbounds @threads for k ∈ 2:data.grid.nz-1
-        ∂z = data.grid.z[k+1] - data.grid.z[k-1]
+        inv∂z = inv(data.grid.z[k+1] - data.grid.z[k-1])
         for j ∈ 2:data.grid.ny-1
-            ∂y = data.grid.y[j+1] - data.grid.y[j-1]
-            for i ∈ 2:data.grid.nx-1
-                ∂x = data.grid.x[i+1] - data.grid.x[i-1]
+            inv∂y = inv(data.grid.y[j+1] - data.grid.y[j-1])
+            @turbo for i ∈ 2:data.grid.nx-1
+                inv∂x = inv(data.grid.x[i+1] - data.grid.x[i-1])
 
                 ∂1 = data.field[3,i,j+1,k] - data.field[3,i,j-1,k]
                 ∂2 = data.field[2,i,j,k+1] - data.field[2,i,j,k-1]
-                res[1,i,j,k] = ∂1/∂y - ∂2/∂z
+                res[1,i,j,k] = ∂1*inv∂y - ∂2*inv∂z
 
                 ∂1 = data.field[1,i,j,k+1] - data.field[1,i,j,k-1]
                 ∂2 = data.field[3,i+1,j,k] - data.field[3,i-1,j,k]
-                res[2,i,j,k] = ∂1/∂z - ∂2/∂x
+                res[2,i,j,k] = ∂1*inv∂z - ∂2*inv∂x
 
                 ∂1 = data.field[2,i+1,j,k] - data.field[2,i-1,j,k]
                 ∂2 = data.field[1,i,j+1,k] - data.field[1,i,j-1,k]
-                res[3,i,j,k] = ∂1/∂x - ∂2/∂y
+                res[3,i,j,k] = ∂1*inv∂x - ∂2*inv∂y
             end
         end
     end

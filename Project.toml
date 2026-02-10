@@ -7,11 +7,13 @@ authors = ["Thomas Vandamme"]
 FiniteDifferences = "26cc04aa-876d-5657-8c51-4c34ba976000"
 ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
 Interpolations = "a98d9a8b-a2ab-59e6-89dd-64a1c18fca59"
+LoopVectorization = "bdcacae8-1622-11e9-2a5c-532679323890"
 NetCDF = "30363a11-5582-574a-97bb-aa9a979735b9"
 NonlinearSolve = "8913a72c-1f9b-4ce2-8d82-65094dcecaec"
 StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
 
 [compat]
+LoopVectorization = "0.12.173"
 julia = "1.7.0"
 
 [extras]

@@ -105,16 +105,31 @@ Computes the mean field and returns it in same dimensions as data.
 
 function mean(data::ScalarData)::ScalarData
     res = zeros(eltype(data.field), size(data.field))
-    for k ∈ 1:data.grid.nz
+    for k ∈ eachindex(data.grid.z)
         res[:,:,k] .= sum(view(data.field, :, :, k))./(data.grid.nx*data.grid.ny)
     end
     return ScalarData("mean($(data.name))", data.grid, data.time, res)
 end
 
 function mean!(data::ScalarData)
-    for k ∈ 1:data.grid.nz
+    for k ∈ eachindex(data.grid.z)
         data.field[:,:,k] .= sum(view(data.field, :, :, k))./(data.grid.nx*data.grid.ny)
     end
+end
+
+function mean(data::VectorData)
+    res = zeros(eltype(data.field), size(data.field))
+    for k ∈ eachindex(data.grid.z)
+        res[:,:,:,k] .= sum(view(data.field, :, : ,:, k))./(data.grid.nx*data.grid.ny)
+    end
+    return VectorData("mean($(data.name))", data.grid, data.time, res)
+end
+
+function mean!(data::VectorData)
+    for k ∈ eachindex(data.grid.z)
+        data.field[:,:,:,k] .= sum(view(data.field, :, : ,:, k))./(data.grid.nx*data.grid.ny)
+    end
+    return nothing
 end
 
 
