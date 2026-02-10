@@ -196,8 +196,8 @@ function calculate_grid(
     println("   lz=$lz, maxstretching=$maxstretching, st1=$st1, nz=$nz")
         
     # Grid points
-    Nx = nx + 1; Ny = ny + 1
-    Δx = lx/Nx; Δy = ly/Ny
+    # Nx = nx + 1; Ny = ny + 1
+    Δx = lx/nx; Δy = ly/ny
     lz0 = (nz-1)*Δx
     st2 = lz0 - st1
     s = collect(1:nz)
@@ -297,8 +297,8 @@ function calculate_grid(
     println("Calculating non-uniform grid ... ")
         
     # Grid points
-    Nx = nx + 1; Ny = ny + 1
-    Δx = lx/Nx; Δy = ly/Ny
+    # Nx = nx + 1; Ny = ny + 1
+    Δx = lx/nx; Δy = ly/ny
     lz0 = (nz-1)*Δx
     # s = collect(1:nz)
     z0 = range(0.0, lz0, nz)
