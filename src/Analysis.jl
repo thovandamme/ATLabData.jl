@@ -1,7 +1,7 @@
 module Analysis
 
 using ..DataStructures
-using Base.Threads
+using Polyester
 using LoopVectorization
 
 export gradient, gradient!, curl, curl!
@@ -14,10 +14,7 @@ end
 
 
 """
-    gradient(data; order=4)
-Return the gradient of _data_ by using the packages _FiniteDifferences_  and 
-_Iterpolations_.  
-_order_ determines the numerical error order for the derivatives.
+    gradient(data)
 """
 global function gradient(
         data::ScalarData{T,I}
@@ -56,7 +53,7 @@ end
 function gradient3D!(
         res::Array{T}, data::ScalarData{T,I}
     ) where {T<:AbstractFloat, I<:Signed}
-    @inbounds @threads for k ∈ eachindex(data.grid.z)
+    @inbounds @batch for k ∈ eachindex(data.grid.z)
         for j ∈ eachindex(data.grid.y)
             for i ∈ eachindex(data.grid.x)
                 # ∂/∂x
@@ -102,7 +99,7 @@ end
 function gradient2D!(
         res::Array{T}, data::ScalarData{T,I}
     ) where {T<:AbstractFloat, I<:Signed}
-    @inbounds @threads for k ∈ eachindex(data.grid.z)
+    @inbounds @batch for k ∈ eachindex(data.grid.z)
         for i ∈ eachindex(data.grid.x)
             # ∂/∂x
             if i==1
@@ -173,7 +170,7 @@ function curl3D!(res::Array{T}, data::VectorData{T,I}) where {T<:AbstractFloat, 
     res[:,1,:,:] .= 0.0
     res[:,:,1,:] .= 0.0
     res[:,:,:,1] .= 0.0
-    @inbounds @threads for k ∈ 2:data.grid.nz-1
+    @inbounds @batch for k ∈ 2:data.grid.nz-1
         inv∂z = inv(data.grid.z[k+1] - data.grid.z[k-1])
         for j ∈ 2:data.grid.ny-1
             inv∂y = inv(data.grid.y[j+1] - data.grid.y[j-1])
@@ -213,7 +210,7 @@ function _curl3D!(res::Array{T}, data::VectorData{T,I}) where {T<:AbstractFloat,
             error("field does not have this component")
         end
     end 
-    @inbounds @threads for k ∈ 2:data.grid.nz-1
+    @inbounds @batch for k ∈ 2:data.grid.nz-1
         for j ∈ 2:data.grid.ny-1
             for i ∈ 2:data.grid.nx-1
                 for α ∈ 1:3 # curl index
@@ -241,6 +238,25 @@ end
         return 1
     else
         return -1
+    end
+end
+
+
+function curl2D!(res::Array{T}, data::VectorData{T,I}) where {T<:AbstractFloat, I<:Signed}
+    # res[1,:,:,:] .= 0.0
+    # res[3,:,:,:] .= 0.0
+    # # Setting the boundaries to zero for simplicity
+    # res[2,1,:,:] .= 0.0
+    # res[2,:,:,1] .= 0.0
+    res .= 0.0
+    @inbounds @batch for k ∈ 2:data.grid.nz-1
+        inv∂z = inv(data.grid.z[k+1] - data.grid.z[k-1])
+        @turbo for i ∈ 2:data.grid.nx-1
+            inv∂x = inv(data.grid.x[i+1] - data.grid.x[i-1])
+            ∂1 = data.field[1,i,1,k+1] - data.field[1,i,1,k-1]
+            ∂2 = data.field[3,i+1,1,k] - data.field[3,i-1,1,k]
+            res[2,i,1,k] = ∂1*inv∂z - ∂2*inv∂x
+        end
     end
 end
 end # end of let scope    

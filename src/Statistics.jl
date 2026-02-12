@@ -115,6 +115,8 @@ function mean!(data::ScalarData)
     for k ∈ eachindex(data.grid.z)
         data.field[:,:,k] .= sum(view(data.field, :, :, k))./(data.grid.nx*data.grid.ny)
     end
+    data.name = "mean($(data.name))"
+    return nothing
 end
 
 function mean(data::VectorData)
@@ -129,6 +131,7 @@ function mean!(data::VectorData)
     for k ∈ eachindex(data.grid.z)
         data.field[:,:,:,k] .= sum(view(data.field, :, : ,:, k))./(data.grid.nx*data.grid.ny)
     end
+    data.name = "mean($(data.name))"
     return nothing
 end
 
@@ -144,6 +147,7 @@ function flucs!(data::ScalarData)
         data.field[:,:,k] .-= sum(view(data.field, :, :, k))./(data.grid.nx*data.grid.ny)
     end
     data.name = "flucs($(data.name))"
+    return nothing
 end
 
 function flucs!(res::ScalarData, data::ScalarData)
@@ -151,6 +155,7 @@ function flucs!(res::ScalarData, data::ScalarData)
         res.field[:,:,k] .-= sum(view(data.field, :, :, k))./(data.grid.nx*data.grid.ny)
     end
     data.name = "flucs($(data.name))"
+    return nothing
 end
 
 function flucs!(data::VectorData)
@@ -163,6 +168,7 @@ function flucs!(data::VectorData)
         end
     end
     data.name = "flucs($(data.name))"
+    return nothing
 end
 
 function flucs!(res::VectorData, data::VectorData)
@@ -172,6 +178,7 @@ function flucs!(res::VectorData, data::VectorData)
         end
     end
     res.name = "flucs($(data.name))"
+    return nothing
 end
 
 
