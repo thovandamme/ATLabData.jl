@@ -153,7 +153,9 @@ end
     curl!(res, data)
 Mutating variant fo curl(data). Stores result in preallocated VectorData res.
 """
-global function curl!(res::VectorData{T,I}, data::VectorData{T,I}) where {T<:AbstractFloat, I<:Signed}
+global function curl!(
+        res::VectorData{T,I}, data::VectorData{T,I}
+    ) where {T<:AbstractFloat, I<:Signed}
     verbose("curl")
     if data.grid.ny > 1
         curl3D!(res.field, data)
@@ -165,7 +167,9 @@ global function curl!(res::VectorData{T,I}, data::VectorData{T,I}) where {T<:Abs
 end
 
 
-function curl3D!(res::Array{T}, data::VectorData{T,I}) where {T<:AbstractFloat, I<:Signed}
+function curl3D!(
+        res::Array{T}, data::VectorData{T,I}
+    ) where {T<:AbstractFloat, I<:Signed}
     # Setting the boundaries to zero for simplicity
     res[:,1,:,:] .= 0.0
     res[:,:,1,:] .= 0.0
@@ -195,7 +199,9 @@ end
 
 
 # This method is much slower
-function _curl3D!(res::Array{T}, data::VectorData{T,I}) where {T<:AbstractFloat, I<:Signed} 
+function _curl3D!(
+        res::Array{T}, data::VectorData{T,I}
+    ) where {T<:AbstractFloat, I<:Signed} 
     @inline function ∂(fieldk, dir, i, j, k)
         dx = data.grid.x[i+1] - data.grid.x[i-1]
         dy = data.grid.y[j+1] - data.grid.y[j-1]
@@ -242,12 +248,9 @@ end
 end
 
 
-function curl2D!(res::Array{T}, data::VectorData{T,I}) where {T<:AbstractFloat, I<:Signed}
-    # res[1,:,:,:] .= 0.0
-    # res[3,:,:,:] .= 0.0
-    # # Setting the boundaries to zero for simplicity
-    # res[2,1,:,:] .= 0.0
-    # res[2,:,:,1] .= 0.0
+function curl2D!(
+        res::Array{T}, data::VectorData{T,I}
+    ) where {T<:AbstractFloat, I<:Signed}
     res .= 0.0
     @inbounds @batch for k ∈ 2:data.grid.nz-1
         inv∂z = inv(data.grid.z[k+1] - data.grid.z[k-1])
@@ -256,6 +259,73 @@ function curl2D!(res::Array{T}, data::VectorData{T,I}) where {T<:AbstractFloat, 
             ∂1 = data.field[1,i,1,k+1] - data.field[1,i,1,k-1]
             ∂2 = data.field[3,i+1,1,k] - data.field[3,i-1,1,k]
             res[2,i,1,k] = ∂1*inv∂z - ∂2*inv∂x
+        end
+    end
+end
+
+
+global function divergence(
+        data::VectorData{T,I}
+    )::ScalarData{T,I} where {T<:AbstractFloat, I<:Signed}
+    verbose("divergence")
+    res = Array{T}(undef, 3, data.grid.nx, data.grid.ny, data.grid.nz)
+    if data.grid.ny > 1
+        divergence3D!(res, data)
+    else
+        divergence2D!(res, data)
+    end
+    return ScalarData(
+        name = "∇⋅($(data.name))",
+        grid = data.grid,
+        time = data.time,
+        field = res
+    )
+end
+
+
+global function divergence!(
+        res::ScalarData{T,I}, data::VectorData{T,I}
+    )::ScalarData{T,I} where {T<:AbstractFloat, I<:Signed}
+    verbose("divergence")
+    if data.grid.ny > 1
+        divergence3D!(res.field, data)
+    else
+        divergence2D!(res.field, data)
+    end
+    res.name = "∇⋅($(data.name))"
+    return nothing
+end
+
+
+function divergence3D!(
+        res::Array{T}, data::VectorData{T,I}
+    ) where {T<:AbstractFloat, I<:Signed}
+    res .= 0.0
+    @inbounds @batch for k ∈ 2:data.grid.nz-1
+        inv∂z = inv(data.grid.z[k+1] - data.grid.z[k-1])
+        for j ∈ 2:data.grid.ny-1
+            inv∂y = inv(data.grid.y[j+1] - datag.rid.y[j-1])
+            for i ∈ 2:data.grid.nx-1
+                inv∂x = inv(data.grid.x[i+1] - data.grid.x[i-1])
+                res[i,j,k] = (data.field[1,i+1,j,k] - data.field[1,i-1,j,k])*inv∂x
+                res[i,j,k] += (data.field[2,i,j+1,k] - data.field[2,i,j-1,k])*inv∂y
+                res[i,j,k] += (data.field[3,i,j,k+1] - data.field[3,i,j,k-1])*inv∂z
+            end
+        end
+    end
+end
+
+
+function divergence2D!(
+        res::Array{T}, data::VectorData{T,I}
+    ) where {T<:AbstractFloat, I<:Signed}
+    res .= 0.0
+    @inbounds @batch for k ∈ 2:data.grid.nz-1
+        inv∂z = inv(data.grid.z[k+1] - data.grid.z[k-1])
+        for i ∈ 2:data.grid.nx-1
+            inv∂x = inv(data.grid.x[i+1] - data.grid.x[i-1])
+            res[i,j,k] = (data.field[1,i+1,j,k] - data.field[1,i-1,j,k])*inv∂x    
+            res[i,j,k] += (data.field[3,i,j,k+1] - data.field[3,i,j,k-1])*inv∂z
         end
     end
 end
