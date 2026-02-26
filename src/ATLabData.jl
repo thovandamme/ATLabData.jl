@@ -3,39 +3,28 @@ Module to load and process data from ATLab in Julia.
 """
 module ATLabData
 
+using Reexport
+
 include("DataStructures.jl")
-using .DataStructures
-    export Grid, ScalarData, VectorData, AveragesData
+@reexport using .DataStructures
 
 include("IO.jl")
-using .IO
-    export load, load!, loadgrid
-    export init
+@reexport using .IO
 
 include("Basics.jl")
-using .Basics
-    export size, display, +, -, *, ^, abs, log, convert, eltype
-    export crop, norm, logarithm
-    export component
+@reexport using .Basics
 
 include("Analysis.jl")
-using .Analysis
-    export gradient, gradeint!, curl, curl!
+@reexport using .Analysis
 
 include("Statistics.jl")
-using .Statistics
-    export average, rms, mean, mean!
-    export flucs, flucs!, wave, wave!, turbulence, turbulence!
+@reexport using .Statistics
 
 include("Tools.jl")
-using .Tools
-    export shiftgrid!, transform_grid, calculate_grid, GridMapping
-    export search_inifile
-    export to_single_precision
+@reexport using .Tools
 
 include("Physics.jl")
-using .Physics
-    export vorticity, enstrophy, Ri, tke, TurbulenceScales
+@reexport using .Physics
 
 
 function __init__()

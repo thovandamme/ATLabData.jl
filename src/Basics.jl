@@ -8,7 +8,6 @@ using ..DataStructures
 export size, display, +, -, *, /, ^, abs, log, view, convert, eltype, logarithm
 export crop
 export component
-export rms, average, mean, flucs
 
 
 """
@@ -236,11 +235,20 @@ convert(T::Type{<:AbstractFloat}, grid::Grid)::Grid{T,Int32} = Grid{T,Int32}(
     grid.scalex, grid.scaley, grid.scalez, 
     grid.x, grid.y, grid.z
 )
+convert(T::Type{<:AbstractFloat}, h::FieldHeader)::FieldHeader{T,Int32} = FieldHeader{T,Int32}(
+    h.headersize, h.nx, h.ny, h.nz, h.iteration, convert(T, h.time), convert(Vector{T}, h.params)
+)
+convert(T::Type{<:AbstractFloat}, h::PlanesHeader)::PlanesHeader{T,Int32} = PlanesHeader{T,Int32}(
+    h.headersize, h.iteration, convert(T, h.time), h.planes
+)
 convert(T::Type{<:AbstractFloat}, data::ScalarData)::ScalarData{T,Int32} = ScalarData{T,Int32}(
     data.name, convert(T, data.grid), data.time, data.field
 )
 convert(T::Type{<:AbstractFloat}, data::VectorData)::VectorData{T,Int32} = VectorData{T,Int32}(
     data.name, convert(T, data.grid), data.time, data.field
+)
+convert(T::Type{<:AbstractFloat}, data::PlaneData)::PlaneData{T,Int32} = PlaneData{T,Int32}(
+    data.name, convert(T, data.header), convert(T, data.grid), data.field
 )
 
 
@@ -251,20 +259,12 @@ eltype(grid::Grid)::Tuple = (eltype(grid.x), eltype(grid.nx))
 eltype(data::AbstractData)::Tuple = eltype(data.grid)
 
 
-# """
-#     deepcopy(data, newdata)
-# Copy _data_ into _newdata_.
-# """
-# # deepcopy(a::ScalarData, b::ScalarData) = 
-
-
-
 """
     display(data)
-Show the available atributes of _data_.
+Show the atributes of _data_.
 """
 function display(data::Grid)
-    println(typeof(data), " with attributes: ")
+    println(typeof(data), " :")
     print("   nx: "); println(data.nx)
     print("   ny: "); println(data.ny)
     print("   nz: "); println(data.nz)
@@ -275,13 +275,38 @@ function display(data::Grid)
     print("   y: "); println(typeof(data.y))
     print("   z: "); println(typeof(data.z))
 end
+function display(h::FieldHeader)
+    println("$(typeof(h)) :")
+    println("   headersize: $(h.headersize)")
+    println("   nx: $(h.nx)")
+    println("   ny: $(h.ny)")
+    println("   nz: $(h.nz)")
+    println("   iteration: $(h.iteration)")
+    println("   time: $(h.time)")
+    println("   params: $(h.params)")
+end
+function display(h::PlanesHeader)
+    println("$(typeof(h)) :")
+    println("   headersize: $(h.headersize)")
+    println("   iteration: $(h.iteration)")
+    println("   time: $(h.time)")
+    println("   planes: $(h.planes)")
+end
 function display(data::AbstractData)
-    println("$(typeof(data)):")
+    println("$(typeof(data)) :")
     print("    name: "); println(data.name)
     print("    grid: "); println(typeof(data.grid))
     print("    field: "); println(typeof(data.field))
     print("    time: "); println(data.time)
 end
+# function display(data::AbstractData)
+#     println("$(typeof(data)) :")
+#     print("    name: "); println(data.name)
+#     print("    header: "); println(typeof(data.header))
+#     print("    grid: "); println(typeof(data.grid))
+#     print("    field: "); println(typeof(data.field))
+# end
+
 
 # ------------------------------------------------------------------------------
 # -------------------- Additional operations -----------------------------------

@@ -1,14 +1,16 @@
 module DataStructures
 
 export AbstractData
-export Grid, ScalarData, VectorData, AveragesData
+export Grid, ScalarData, VectorData, AveragesData, PlaneData
+export FieldHeader, PlanesHeader
 
 
 """ Parent abstract type for all composite types containing the data """
 abstract type AbstractData{T<:AbstractFloat, I<:Signed} end
+# abstract type AbstractHeader{T<:AbstractFloat, I<:Signed} end
 
 
-mutable struct Grid{T,I} <: AbstractData{T,I}
+mutable struct Grid{T<:AbstractFloat,I<:Signed}
     nx::I
     ny::I
     nz::I
@@ -28,36 +30,57 @@ Grid(;
 ) = Grid(nx, ny, nz, lx, ly, lz, x, y, z)
 
 
-mutable struct ScalarData{T,I} <: AbstractData{T,I}
+@kwdef mutable struct FieldHeader{T<:AbstractFloat,I<:Signed}
+    headersize::I
+    nx::I
+    ny::I
+    nz::I
+    iteration::I
+    time::T
+    params::Vector{T}
+end
+
+
+@kwdef mutable struct PlanesHeader{T<:AbstractFloat,I<:Signed}
+    headersize::I
+    iteration::I
+    time::T
+    planes::Vector{I}
+end
+
+
+@kwdef mutable struct ScalarData{T,I} <: AbstractData{T,I}
     name::String
     grid::Grid{T,I}
+    iteration::Int32 = Int32(-1)
     time::T
     field::Array{T,3}
 end
-ScalarData(;
-    name::String, grid::Grid, time::AbstractFloat, field::Array{<:AbstractFloat, 3}
-) = ScalarData(name, grid, time, field)
 
 
-mutable struct VectorData{T,I} <: AbstractData{T,I}
+# @kwdef mutable struct ScalarData{T,I} <: AbstractData{T,I}
+#     name::String
+#     header::FieldHeader{T,I}
+#     grid::Grid{T,I}
+#     field::Array{T,3}
+# end
+
+
+@kwdef mutable struct VectorData{T,I} <: AbstractData{T,I}
     name::String
     grid::Grid{T,I}
+    iteration::Int32 = Int32(-1)
     time::T
     field::Array{T,4}
 end
-VectorData(;
-    name::String, grid::Grid, time::AbstractFloat, field::Array{<:AbstractFloat, 4}
-) = VectorData(name, grid, time, field)
-# VectorData(;
-#     name::String, grid::Grid, time::AbstractFloat, 
-#     xfield::Array{<:AbstractFloat,3}, 
-#     yfield::Array{<:AbstractFloat,3}, 
-#     zfield::Array{<:AbstractFloat,3},
-# ) = begin
 
-#     return 
+
+# @kwdef mutable struct VectorData{T,I} <: AbstractData{T,I}
+#     name::String
+#     header::FieldHeader{T,I}
+#     grid::Grid{T,I}
+#     field::Array{T,4}
 # end
-
 
 
 mutable struct AveragesData{T,I} <: AbstractData{T,I}
@@ -80,6 +103,14 @@ AveragesData(;
     ),
     field
 )
+
+
+@kwdef mutable struct PlaneData{T,I} <: AbstractData{T,I}
+    name::String
+    header::PlanesHeader{T,I}
+    grid::Grid{T,I}
+    field::Array{T,2}
+end
 
 
 function Base.getindex(data::ScalarData, i::Int, j::Int, k::Int)

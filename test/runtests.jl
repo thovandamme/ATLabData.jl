@@ -2,14 +2,32 @@ using ATLabData
 using Test
 
 @testset "ATLabData.jl" begin
-    grid = loadgrid("/home/thomas/simulations/tmp/grid")
-    data = convert(Float32, init(grid))
-    load!(data, "/home/thomas/simulations/tmp/scal.10000.1")
-    @time buffer = ATLabData.Basics._crop(data, zmin=10, zmax=60)
-    @time buffer = ATLabData.Basics._crop(data, zmin=10, zmax=60)
-    @time buffer = ATLabData.Basics._crop(data, zmin=10, zmax=60)
-    println("-----")
-    @time buffer2 = ATLabData.Basics.crop(data, zmin=10, zmax=60)
-    @time buffer2 = ATLabData.Basics.crop(data, zmin=10, zmax=60)
-    @time buffer2 = ATLabData.Basics.crop(data, zmin=10, zmax=60)
+    test_Grid()
+    test_ScalarData()
+    test_VectorData()
+    test_PlaneData()
+end
+
+function test_Grid()
+    # TODO
+end
+
+function test_ScalarData()
+    println("Running tests for ScalarData ...")
+    file = "files/scal.0.1"
+    data = load(file)
+    data = convert(Float32, data)
+    data = crop(data)
+    gradient(data)
+    data*data^2 - data + 2*data/data
+    abs(data)
+    return nothing
+end
+
+function test_VectorData()
+    # TODO
+end
+
+function test_PlaneData()
+    # TODO
 end

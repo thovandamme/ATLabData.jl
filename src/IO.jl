@@ -3,8 +3,7 @@ module IO
 using NetCDF
 using ..DataStructures
 
-export load, load!, loadgrid
-export init
+export load, load!, loadgrid, init, header
 
 let 
 # ------------------------------------------------------------------------------
@@ -33,6 +32,12 @@ type _VectorData_.
     load(file, var) -> AveragesData
 Load the data contained in the path _file_ into the type _AveragesData_.
 _file_ has to be NetCDF file containing the averages from _average.x_.
+
+    load(file, plane, var; vars) -> PlaneData
+Load data from a planes _file_ into the container PlaneData. _plane_ is the 
+axis index and var the varible which are supposed to be loaded, where var 
+needs to the keys in the Dict _vars_. If _vars_ is not given, then it defaults 
+to (:u, :v, :w, :b).
 """
 global load(
     file::String; prec::Type=Float32
@@ -45,7 +50,11 @@ global load(
 )::VectorData = _VectorData_from_files(xfile, yfile, zfile, prec)
 global load(
     file::String, var::String
-)::AveragesData = AveragesData_from_NetCDF(file, var)
+)::AveragesData = _AveragesData_from_NetCDF(file, var)
+global load(
+    file::String, plane::Int, var::Symbol; prec::Type=Float32, 
+    vars::Dict=Dict(:u=>1, :v=>2, :w=>3, :b=>4)
+) = _PlaneData_from_raw(file, plane, var, prec, vars)
 
 
 """
@@ -172,6 +181,24 @@ function _ScalarData_from_raw(
         field = buffer
     )
 end
+
+
+# function _ScalarData_from_raw(
+#         fieldfile::String, T::Type
+#     )::ScalarData{T, Int32}
+#     io = open(fieldfile, "r")
+#     grid = convert(T, _Grid_from_file(dirname(fieldfile)))
+#     h = convert(T, _fieldheader(io))
+#     # (h.nx!=grid.nx || h.ny!=grid.ny || h.nz!=grid.nz) && error("Grid size mismatch!")
+#     buffer = _Array_from_rawfile_(io, h)
+#     close(io)
+#     return ScalarData(
+#         name = basename(fieldfile),
+#         grid = grid,
+#         header = h,
+#         field = buffer
+#     )
+# end
 
 
 function _ScalarData_from_visuals(fieldfile::String)::ScalarData{Float32, Int32}
@@ -330,14 +357,26 @@ function _Array_from_rawfile(
     seek(io, headersize) # Jump to first last entry belonging to the header
     buffer = Vector{T}(undef, grid.nx*grid.ny*grid.nz)
     read!(io, buffer)
+    close(io)
     return reshape(buffer, (grid.nx, grid.ny, grid.nz)), time
+end
+
+
+function _Array_from_rawfile_(
+        io::IOStream, h::FieldHeader{T,I}
+    )::Array{T, 3} where {T<:AbstractFloat, I<:Signed}
+    buffer = Vector{T}(undef, h.nx*h.ny*h.nz)
+    seek(io, h.headersize)
+    read!(io, buffer)
+    close(io)
+    return reshape(buffer, (h.nx, h.ny, h.nz))
 end
 
 
 # ------------------------------------------------------------------------------
 #                            AveragesData
 # ------------------------------------------------------------------------------
-function AveragesData_from_NetCDF(file::String, var::String)::AveragesData
+function _AveragesData_from_NetCDF(file::String, var::String)::AveragesData
     return AveragesData(
         name = var,
         time = ncread(file, "t"),
@@ -348,7 +387,139 @@ end
 
 
 # ------------------------------------------------------------------------------
-#                             Helping functions
+#                               PlaneData
+# ------------------------------------------------------------------------------
+function _PlaneData_from_raw(
+        file::String, plane::Int, var::Symbol, prec::Type, vars::Dict
+    )#::PlaneData{prec,Int32}
+    # Inspired by planes2planes.py from atlab
+    """
+        Header: headersize::Int32, iteration::Int32, time::Float32, planeindices::Int32
+        data: variable -> planes (data is ordered by variables and then by plane indices)
+        variables: TODO In which order are they stored?
+        The dictinoary vars containes the indices for the varibales, that can be 
+            given by var.
+    """
+    !haskey(vars, var) && error("var has to be a key of the dictionary vars.")
+    grid = convert(prec, loadgrid(joinpath(dirname(file), "grid")))
+    planesize = 0; n1 = 0; n2 = 0
+    filename = basename(file)
+    if split(filename, ".")[1]=="planesI"
+        planesize = grid.ny*grid.nz
+        grid.nx = 1
+        val = grid.x[plane]
+        grid.x = ones(prec, 1)*val
+        n1 = grid.ny
+        n2 = grid.nz
+    elseif split(filename, ".")[1]=="planesJ"
+        planesize = grid.nx*grid.nz
+        grid.ny = 1
+        val = grid.y[plane]
+        grid.y = ones(prec, 1)*val
+        n1 = grid.nx
+        n2 = grid.nz
+    elseif split(filename, ".")[1]=="planesK"
+        planesize = grid.nx*grid.ny
+        grid.nz = 1
+        val = grid.z[plane]
+        grid.z = ones(prec, 1)*val
+        n1 = grid.nx
+        n2 = grid.ny
+    else
+        error("Do not know how to handle this planes-file.")
+    end
+    io = open(file, "r")
+    h = _planesheader(io)
+    !(plane ∈ h.planes) && error(
+        "Plane with index $plane is not in $file. Available planes are $(h.planes)"
+    )
+    
+    # Number of variables
+    sizeoffile = filesize(io) # file size in bytes
+    sizeofvars = (sizeoffile - h.headersize)÷(planesize*length(h.planes)*sizeof(prec)) # in bytes
+    nvars = sizeofvars/sizeof(prec) # number of variables
+    println("Number of variables in $file: \n $nvars")
+    (nvars != length(vars)) && (
+        @warn "The number of variables in vars is not the number of variables in $file"
+    )
+    
+    # Find position of plane in file and read into buffer
+    iplane = argmin(abs.(h.planes .- plane))
+    # seek(
+    #     io, 
+    #     h.headersize + ((vars[var]-1)*length(h.planes)+iplane)*planesize*sizeof(prec)
+    # )
+    # buffer = Vector{prec}(undef, planesize)
+    # read!(io, buffer)
+    close(io)
+    # return PlaneData(
+    #     name = "$plane-$var-$(basename(file))",
+    #     header = h,
+    #     grid = grid,
+    #     field = reshape(buffer, (n1, n2))
+    # )
+end
+
+
+# ------------------------------------------------------------------------------
+#                             Header loading
+# ------------------------------------------------------------------------------
+"""
+    header(file)
+Returns the header of _file_.
+"""
+global function header(file::String)
+    filename = basename(file)
+    io = open(file, "r")
+    if startswith(filename, "scal.") || startswith(filename, "flow.")
+        h = _fieldheader(io)
+        close(io)
+        return h
+    elseif startswith(filename, "planes")
+        h = _planesheader(io)
+        close(io)
+        return h
+    else
+        error("Do not know how to get the header of this file.")
+    end
+end
+
+
+function _fieldheader(io::IOStream)::FieldHeader{Float64,Int32}
+    """ 
+        Header contains: 
+        headersize/offset, nx, ny, nz, nt, time, visc, froude
+        unformatted with no record markers
+    """
+    headersize = read(io, Int32)
+    nx = read(io, Int32)
+    ny = read(io, Int32)
+    nz = read(io, Int32)
+    iteration = read(io, Int32)
+    time = read(io, Float64)
+    bytesofparams = headersize-sizeof(headersize)
+    bytesofparams = bytesofparams-sizeof(nx)- sizeof(ny)-sizeof(nz)
+    bytesofparams = bytesofparams-sizeof(iteration)- sizeof(time)
+    params = reinterpret(Float64, read(io, bytesofparams))
+    return FieldHeader{Float64,Int32}(
+        headersize, nx, ny, nz, iteration, time, params
+    )
+end
+
+
+function _planesheader(io::IOStream)::PlanesHeader{Float64,Int32}
+    headersize = read(io, Int32)
+    iteration = read(io, Int32)
+    time = read(io, Float64)
+    setofplanes = reinterpret(Int32, read(io, (headersize-4-4-8)))
+    return PlanesHeader{Float64,Int32}(
+        headersize, iteration, time, setofplanes
+    )
+end
+
+
+# ------------------------------------------------------------------------------
+#                          Helping functions
 # ------------------------------------------------------------------------------
 function _timestep_from_filename(filename::String)::Int
     namestring = split(filename, "/")[end]
