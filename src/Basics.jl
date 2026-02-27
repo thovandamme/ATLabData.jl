@@ -259,55 +259,6 @@ eltype(grid::Grid)::Tuple = (eltype(grid.x), eltype(grid.nx))
 eltype(data::AbstractData)::Tuple = eltype(data.grid)
 
 
-"""
-    display(data)
-Show the atributes of _data_.
-"""
-function display(data::Grid)
-    println(typeof(data), " :")
-    print("   nx: "); println(data.nx)
-    print("   ny: "); println(data.ny)
-    print("   nz: "); println(data.nz)
-    print("   scalex: "); println(data.scalex)
-    print("   scaley: "); println(data.scaley)
-    print("   scalez: "); println(data.scalez)
-    print("   x: "); println(typeof(data.x))
-    print("   y: "); println(typeof(data.y))
-    print("   z: "); println(typeof(data.z))
-end
-function display(h::FieldHeader)
-    println("$(typeof(h)) :")
-    println("   headersize: $(h.headersize)")
-    println("   nx: $(h.nx)")
-    println("   ny: $(h.ny)")
-    println("   nz: $(h.nz)")
-    println("   iteration: $(h.iteration)")
-    println("   time: $(h.time)")
-    println("   params: $(h.params)")
-end
-function display(h::PlanesHeader)
-    println("$(typeof(h)) :")
-    println("   headersize: $(h.headersize)")
-    println("   iteration: $(h.iteration)")
-    println("   time: $(h.time)")
-    println("   planes: $(h.planes)")
-end
-function display(data::AbstractData)
-    println("$(typeof(data)) :")
-    print("    name: "); println(data.name)
-    print("    grid: "); println(typeof(data.grid))
-    print("    field: "); println(typeof(data.field))
-    print("    time: "); println(data.time)
-end
-# function display(data::AbstractData)
-#     println("$(typeof(data)) :")
-#     print("    name: "); println(data.name)
-#     print("    header: "); println(typeof(data.header))
-#     print("    grid: "); println(typeof(data.grid))
-#     print("    field: "); println(typeof(data.field))
-# end
-
-
 # ------------------------------------------------------------------------------
 # -------------------- Additional operations -----------------------------------
 # ------------------------------------------------------------------------------

@@ -1,5 +1,7 @@
 module DataStructures
 
+using Parameters
+
 export AbstractData
 export Grid, ScalarData, VectorData, AveragesData, PlaneData
 export FieldHeader, PlanesHeader
@@ -30,7 +32,7 @@ Grid(;
 ) = Grid(nx, ny, nz, lx, ly, lz, x, y, z)
 
 
-@kwdef mutable struct FieldHeader{T<:AbstractFloat,I<:Signed}
+@with_kw mutable struct FieldHeader{T<:AbstractFloat,I<:Signed}
     headersize::I
     nx::I
     ny::I
@@ -41,7 +43,7 @@ Grid(;
 end
 
 
-@kwdef mutable struct PlanesHeader{T<:AbstractFloat,I<:Signed}
+@with_kw mutable struct PlanesHeader{T<:AbstractFloat,I<:Signed}
     headersize::I
     iteration::I
     time::T
@@ -49,7 +51,7 @@ end
 end
 
 
-@kwdef mutable struct ScalarData{T,I} <: AbstractData{T,I}
+@with_kw mutable struct ScalarData{T,I} <: AbstractData{T,I}
     name::String
     grid::Grid{T,I}
     iteration::Int32 = Int32(-1)
@@ -66,7 +68,7 @@ end
 # end
 
 
-@kwdef mutable struct VectorData{T,I} <: AbstractData{T,I}
+@with_kw mutable struct VectorData{T,I} <: AbstractData{T,I}
     name::String
     grid::Grid{T,I}
     iteration::Int32 = Int32(-1)
@@ -105,7 +107,7 @@ AveragesData(;
 )
 
 
-@kwdef mutable struct PlaneData{T,I} <: AbstractData{T,I}
+@with_kw mutable struct PlaneData{T,I} <: AbstractData{T,I}
     name::String
     header::PlanesHeader{T,I}
     grid::Grid{T,I}

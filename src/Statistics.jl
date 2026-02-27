@@ -20,19 +20,19 @@ function average(data::ScalarData; coord=3)::AveragesData
     println("Computing averages along coord=$coord ...")
     printstyled("   $(data.name)  \n")
     if coord==1
-        res = zeros(eltype(data)[1], data.grid.nx)
+        res = zeros(eltype(data)[1], (data.grid.nx, 1))
         for i ∈ 1:data.grid.nx
             res[i] = sum(view(data.field, i, :, :)) / (data.grid.ny*data.grid.nz)
         end
         range = data.grid.x
     elseif coord==2
-        res = zeros(eltype(data)[1], data.grid.ny)
+        res = zeros(eltype(data)[1], (data.grid.ny, 1))
         for j ∈ 1:data.grid.ny
             res[j] = sum(view(data.field, :, j, :)) / (data.grid.nx*data.grid.nz)
         end
         range = data.grid.y
     elseif coord==3
-        res = zeros(eltype(data)[1], data.grid.nz)
+        res = zeros(eltype(data)[1], (data.grid.nz, 1))
         for k ∈ 1:data.grid.nz
             res[k] = sum(view(data.field, :, :, k)) / (data.grid.nx*data.grid.ny)
         end
@@ -41,7 +41,7 @@ function average(data::ScalarData; coord=3)::AveragesData
         error("coord has be in {1,2,3}")
     end
     name = "avg$coord($(data.name))"
-    return AveragesData(name=name, time=data.time, z=range, field=res)
+    return AveragesData(name=name, time=[data.time], z=range, field=res)
 end
 
 
