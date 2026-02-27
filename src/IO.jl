@@ -53,7 +53,7 @@ global load(
 )::AveragesData = _AveragesData_from_NetCDF(file, var)
 global load(
     file::String, plane::Int, var::Symbol; prec::Type=Float32, 
-    vars::Dict=Dict(:u=>1, :v=>2, :w=>3, :b=>4)
+    vars::Dict=Dict(:u=>1, :v=>2, :w=>3, :b=>4, :p=>5)
 ) = _PlaneData_from_raw(file, plane, var, prec, vars)
 
 
@@ -63,12 +63,15 @@ Version of _load_ for preallocated data container. This function does not
     update the grid attribute!
 """
 global load!(
-    data::ScalarData, file::String; prec=Float32
-) = _ScalarData_from_file!(data, file)
+    data::ScalarData{T,I}, file::String
+) where {T<:AbstractFloat, I<:Signed} = _ScalarData_from_file!(data, file)
 global load!(
-    data::VectorData, 
-    xfile::String, yfile::String, zfile::String
-) = _VectorData_from_file!(data, xfile, yfile, zfile)
+    data::VectorData{T,I}, xfile::String, yfile::String, zfile::String
+) where {T<:AbstractFloat, I<:Signed} = _VectorData_from_file!(data, xfile, yfile, zfile)
+global load!(
+    data::PlaneData{T,I}, file::String, plane::Int, var::Symbol; 
+    vars::Dict=Dict(:u=>1, :v=>2, :w=>3, :b=>4, :p=>5)
+) where {T<:AbstractFloat, I<:Signed} = _PlaneData_from_raw!(data, file, plane, var, vars)
 
 
 """
@@ -391,7 +394,7 @@ end
 # ------------------------------------------------------------------------------
 function _PlaneData_from_raw(
         file::String, plane::Int, var::Symbol, prec::Type, vars::Dict
-    )#::PlaneData{prec,Int32}
+    )::PlaneData{prec,Int32}
     # Inspired by planes2planes.py from atlab
     """
         Header: headersize::Int32, iteration::Int32, time::Float32, planeindices::Int32
@@ -433,31 +436,80 @@ function _PlaneData_from_raw(
     !(plane ∈ h.planes) && error(
         "Plane with index $plane is not in $file. Available planes are $(h.planes)"
     )
-    
     # Number of variables
-    sizeoffile = filesize(io) # file size in bytes
-    sizeofvars = (sizeoffile - h.headersize)÷(planesize*length(h.planes)*sizeof(prec)) # in bytes
-    nvars = sizeofvars/sizeof(prec) # number of variables
-    println("Number of variables in $file: \n $nvars")
+    fieldbytes = filesize(io) - h.headersize
+    planebytes = planesize*sizeof(prec)
+    varbytes = length(h.planes)*planebytes
+    nvars = fieldbytes÷varbytes
     (nvars != length(vars)) && (
-        @warn "The number of variables in vars is not the number of variables in $file"
+        @warn begin
+            "The number of variables in vars is not the number of variables in $file.\n"
+            "Number of variables in $file: \n $nvars"
+        end
     )
-    
     # Find position of plane in file and read into buffer
     iplane = argmin(abs.(h.planes .- plane))
-    # seek(
-    #     io, 
-    #     h.headersize + ((vars[var]-1)*length(h.planes)+iplane)*planesize*sizeof(prec)
-    # )
-    # buffer = Vector{prec}(undef, planesize)
-    # read!(io, buffer)
+    seek(
+        io, 
+        h.headersize + ((vars[var]-1)*length(h.planes)+iplane)*planesize*sizeof(prec)
+    )
+    buffer = Vector{prec}(undef, planesize)
+    read!(io, buffer)
     close(io)
-    # return PlaneData(
-    #     name = "$plane-$var-$(basename(file))",
-    #     header = h,
-    #     grid = grid,
-    #     field = reshape(buffer, (n1, n2))
-    # )
+    return PlaneData(
+        name = "$plane-$var-$(basename(file))",
+        header = convert(prec, h),
+        grid = grid,
+        field = reshape(buffer, (n1, n2))
+    )
+end
+
+
+function _PlaneData_from_raw!(
+        data::PlaneData{T,I}, file::String, plane::Int, var::Symbol, vars::Dict
+    ) where {T<:AbstractFloat, I<:Signed}
+    !haskey(vars, var) && error("var has to be a key of the dictionary vars.")
+    filename = basename(file)
+    if split(filename, ".")[1]=="planesI"
+        n1 = data.grid.ny
+        n2 = data.grid.nz
+    elseif split(filename, ".")[1]=="planesJ"
+        n1 = data.grid.nx
+        n2 = data.grid.nz
+    elseif split(filename, ".")[1]=="planesK"
+        n1 = data.grid.nx
+        n2 = data.grid.ny
+    else
+        error("Do not know how to handle this planes-file.")
+    end
+    io = open(file, "r")
+    h = _planesheader(io)
+    !(plane ∈ h.planes) && error(
+        "Plane with index $plane is not in $file. Available planes are $(h.planes)"
+    )
+    # Number of variables
+    planesize = length(data.field)
+    fieldbytes = filesize(io) - h.headersize
+    planebytes = planesize*sizeof(T)
+    varbytes = length(h.planes)*planebytes
+    nvars = fieldbytes÷varbytes
+    (nvars != length(vars)) && (
+        @warn begin
+            "The number of variables in vars is not the number of variables in $file.\n"
+            "Number of variables in $file: \n $nvars"
+        end
+    )
+    # Find position of plane in file and read into buffer
+    iplane = argmin(abs.(h.planes .- plane))
+    seek(
+        io, 
+        h.headersize + ((vars[var]-1)*length(h.planes)+iplane)*planesize*sizeof(T)
+    )
+    buffer = Vector{T}(undef, planesize)
+    read!(io, buffer)
+    close(io)
+    data.field .= reshape(buffer, (n1, n2))
+    return nothing
 end
 
 
