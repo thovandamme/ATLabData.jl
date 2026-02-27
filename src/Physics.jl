@@ -1,6 +1,6 @@
 module Physics
 
-using ..DataStructures, ..IO, ..Basics, ..Statistics
+using ..DataStructures, ..IO, ..Basics, ..Statistics, ..Analysis
 
 using ForwardDiff
 
@@ -68,7 +68,10 @@ Ri(b::ScalarData, ux::ScalarData, uy::ScalarData, uz::ScalarData)::ScalarData = 
     name = "Rig("*b.name*")",
     time = b.time,
     grid = b.grid,
-    field = norm(gradient(b)).field ./ (norm(gradient(ux)).field.^2 + norm(gradient(uy)).field.^2 + norm(gradient(uz)).field.^2)
+    field = (
+        norm(gradient(b)).field ./ (norm(gradient(ux)).field.^2 
+        + norm(gradient(uy)).field.^2 + norm(gradient(uz)).field.^2)
+    )
 )
 Ri(dir::String, time::Real)::ScalarData = Ri(
     load(dir, "Buoyancy", time),
@@ -83,13 +86,13 @@ function Reynolds_stress(u::VectorData)::Matrix
 end
 
 
-function tke(data::VectorData)::ScalarData
-    buffer = flucs(data)
+function tke(u::VectorData)::ScalarData
+    buffer = flucs(u)
     return ScalarData(
-        "tke($(data.name))", 
-        data.grid, 
-        data.time,
-        0.5f0 .* (buffer.field[1,:,:,:].^2 .+ buffer.field[2,:,:,:].^2 .+ buffer.field[3,:,:,:].^2)
+        "tke($(u.name))", 
+        u.grid, 
+        u.time,
+        0.5 .* (buffer.field[1,:,:,:].^2 .+ buffer.field[2,:,:,:].^2 .+ buffer.field[3,:,:,:].^2)
     )
 end
 
