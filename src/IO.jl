@@ -451,7 +451,7 @@ function _PlaneData_from_raw(
     iplane = argmin(abs.(h.planes .- plane))
     seek(
         io, 
-        h.headersize + ((vars[var]-1)*length(h.planes)+iplane)*planesize*sizeof(prec)
+        h.headersize + ((vars[var]-1)*length(h.planes)+(iplane-1))*planebytes
     )
     buffer = Vector{prec}(undef, planesize)
     read!(io, buffer)
@@ -503,7 +503,7 @@ function _PlaneData_from_raw!(
     iplane = argmin(abs.(h.planes .- plane))
     seek(
         io, 
-        h.headersize + ((vars[var]-1)*length(h.planes)+iplane)*planesize*sizeof(T)
+        h.headersize + ((vars[var]-1)*length(h.planes)+(iplane-1))*planebytes
     )
     buffer = Vector{T}(undef, planesize)
     read!(io, buffer)
