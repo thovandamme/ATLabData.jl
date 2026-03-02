@@ -4,7 +4,7 @@ using ..DataStructures
 using Polyester
 using LoopVectorization
 
-export gradient, gradient!, curl, curl!
+export gradient, gradient!, curl, curl!, divergence, divergence!
 
 
 let
@@ -38,7 +38,7 @@ end
 global function gradient!(
         res::VectorData{T,I},
         data::ScalarData{T,I}
-    )::VectorData{T,I} where {T<:AbstractFloat, I<:Signed}
+    ) where {T<:AbstractFloat, I<:Signed}
     verbose("gradient")
     if data.grid.ny > 1
         gradient3D!(res.field, data)
@@ -277,12 +277,14 @@ global function divergence(
     return ScalarData(
         name = "∇⋅($(data.name))",
         grid = data.grid,
+        iteration = data.iteration,
         time = data.time,
         field = res
     )
 end
 
 
+# TODO divergence errors
 global function divergence!(
         res::ScalarData{T,I}, data::VectorData{T,I}
     )::ScalarData{T,I} where {T<:AbstractFloat, I<:Signed}
@@ -324,8 +326,8 @@ function divergence2D!(
         inv∂z = inv(data.grid.z[k+1] - data.grid.z[k-1])
         for i ∈ 2:data.grid.nx-1
             inv∂x = inv(data.grid.x[i+1] - data.grid.x[i-1])
-            res[i,j,k] = (data.field[1,i+1,j,k] - data.field[1,i-1,j,k])*inv∂x    
-            res[i,j,k] += (data.field[3,i,j,k+1] - data.field[3,i,j,k-1])*inv∂z
+            res[i,1,k] = (data.field[1,i+1,1,k] - data.field[1,i-1,1,k])*inv∂x    
+            res[i,1,k] += (data.field[3,i,1,k+1] - data.field[3,i,1,k-1])*inv∂z
         end
     end
 end

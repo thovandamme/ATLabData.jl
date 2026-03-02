@@ -108,7 +108,13 @@ function mean(data::ScalarData)::ScalarData
     for k ∈ eachindex(data.grid.z)
         res[:,:,k] .= sum(view(data.field, :, :, k))./(data.grid.nx*data.grid.ny)
     end
-    return ScalarData("mean($(data.name))", data.grid, data.time, res)
+    return ScalarData(
+        name = "mean($(data.name))", 
+        grid = data.grid, 
+        iteration = data.iteration,
+        time = data.time, 
+        field = res
+    )
 end
 
 function mean!(data::ScalarData)
@@ -124,7 +130,9 @@ function mean(data::VectorData)
     for k ∈ eachindex(data.grid.z)
         res[:,:,:,k] .= sum(view(data.field, :, : ,:, k))./(data.grid.nx*data.grid.ny)
     end
-    return VectorData("mean($(data.name))", data.grid, data.time, res)
+    return VectorData(
+        name="mean($(data.name))", grid=data.grid, time=data.time, field=res
+    )
 end
 
 function mean!(data::VectorData)
@@ -195,7 +203,13 @@ function wave(data::ScalarData, mode::Int)::ScalarData
             wfield[:,j,k] .= phase_average(data.field[:,j,k], mode) .- mfield[:,j,k]
         end
     end
-    return ScalarData("wave($(data.name))", data.grid, data.time, wfield)
+    return ScalarData(
+        name = "wave($(data.name))", 
+        grid = data.grid, 
+        iteration = data.iteration,
+        time = data.time, 
+        field = wfield
+    )
 end
 
 function wave!(data::ScalarData, mode::Int)
@@ -222,7 +236,13 @@ function turbulence(data::ScalarData, modes::Vector{Int})::ScalarData
         tfield .= tfield .- wave(data, mode).field
     end
     tfield .= tfield .- mean(data).field
-    return ScalarData("turb($(data.name))", data.grid, data.time, tfield)
+    return ScalarData(
+        name = "turb($(data.name))", 
+        grid = data.grid,
+        iteration = data.iteration, 
+        time = data.time, 
+        field = tfield
+    )
 end
 
 function turbulence!(data::ScalarData, modes::Vector{Int})

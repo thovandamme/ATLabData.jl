@@ -218,14 +218,6 @@ sqrt(data::ScalarData) = ScalarData(
 )
 
 
-# maximum(data::AveragesData{T,I}) where {T<:AbstractFloat} = maximum(data.field)
-# maximum(data::ScalarData{T,I}) where {T<:AbstractFloat} = maximum(data.field)
-
-
-# minimum(data::AveragesData{T,I}) where {T<:AbstractFloat} = minimum(data.field)
-# minimum(data::ScalarData{T,I}) where {T<:AbstractFloat} = minimum(data.field)
-
-
 """
     convert(T, data)
 Convert the entries in data to T.
@@ -242,10 +234,10 @@ convert(T::Type{<:AbstractFloat}, h::PlanesHeader)::PlanesHeader{T,Int32} = Plan
     h.headersize, h.iteration, convert(T, h.time), h.planes
 )
 convert(T::Type{<:AbstractFloat}, data::ScalarData)::ScalarData{T,Int32} = ScalarData{T,Int32}(
-    data.name, convert(T, data.grid), data.time, data.field
+    data.name, convert(T, data.grid), data.iteration, convert(T, data.time), convert(Array{T,3}, data.field)
 )
 convert(T::Type{<:AbstractFloat}, data::VectorData)::VectorData{T,Int32} = VectorData{T,Int32}(
-    data.name, convert(T, data.grid), data.time, data.field
+    data.name, convert(T, data.grid), data.iteration, data.time, data.field
 )
 convert(T::Type{<:AbstractFloat}, data::PlaneData)::PlaneData{T,Int32} = PlaneData{T,Int32}(
     data.name, convert(T, data.header), convert(T, data.grid), data.field
@@ -273,6 +265,7 @@ function component(data::VectorData, field::Symbol)::ScalarData
             name = data.name * " - "*string(field),
             time = data.time,
             grid = data.grid,
+            iteration = data.iteration,
             field = data.field[1,:,:,:]
         )
     elseif field == :y
@@ -280,6 +273,7 @@ function component(data::VectorData, field::Symbol)::ScalarData
             name = data.name * " - "*string(field),
             time = data.time,
             grid = data.grid,
+            iteration = data.iteration,
             field = data.field[2,:,:,:]
         )
     elseif field == :z
@@ -287,6 +281,7 @@ function component(data::VectorData, field::Symbol)::ScalarData
             name = data.name * " - "*string(field),
             time = data.time,
             grid = data.grid,
+            iteration = data.iteration,
             field = data.field[3,:,:,:]
         )
     else
@@ -400,8 +395,8 @@ function crop(
     kmin = findmin(abs.(data.grid.z .- zmin))[2]
     kmax = findmin(abs.(data.grid.z .- zmax))[2]
     return ScalarData(
-        "crop($(data.name))",
-        Grid{eltype(data)[1], eltype(data)[2]}(
+        name = "crop($(data.name))",
+        grid = Grid{eltype(data)[1], eltype(data)[2]}(
             imax + 1 - imin,
             jmax + 1 - jmin,
             kmax + 1 - kmin,
@@ -412,8 +407,9 @@ function crop(
             data.grid.y[jmin:jmax],
             data.grid.z[kmin:kmax]
         ), 
-        data.time,
-        data.field[imin:imax,jmin:jmax,kmin:kmax],
+        iteration = data.iteration,
+        time = data.time,
+        field = data.field[imin:imax,jmin:jmax,kmin:kmax],
     )
 end
 

@@ -89,10 +89,11 @@ end
 function tke(u::VectorData)::ScalarData
     buffer = flucs(u)
     return ScalarData(
-        "tke($(u.name))", 
-        u.grid, 
-        u.time,
-        0.5 .* (buffer.field[1,:,:,:].^2 .+ buffer.field[2,:,:,:].^2 .+ buffer.field[3,:,:,:].^2)
+        name = "tke($(u.name))", 
+        grid = u.grid,
+        iteration = u.iteration, 
+        time = u.time,
+        field = 0.5 .* (buffer.field[1,:,:,:].^2 .+ buffer.field[2,:,:,:].^2 .+ buffer.field[3,:,:,:].^2)
     )
 end
 
