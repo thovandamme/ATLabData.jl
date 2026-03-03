@@ -2,6 +2,7 @@ module Tools
 
 using Interpolations
 using NonlinearSolve
+using NaturalSort
 using ..DataStructures
 using ..IO: init
 
@@ -9,6 +10,7 @@ export GridMapping
 export shiftgrid!, transform_grid, calculate_grid
 export search_inifile
 export to_single_precision
+export filefilter!
 
 
 module GridMapping
@@ -533,7 +535,7 @@ Takes the Vector{String} _filenames_ and filters it by _field_, _startstep_,
 _stopstep_ and _component_. _component_ represents the filename ending, e.g. 
 ".1" ind "flow.1000.1". _field_ is in that case "flow.".
 """
-function filefilter(
+function filefilter!(
         filenames::Vector{String}, 
         field::String, 
         startstep::Int, stopstep::Int, 
@@ -566,8 +568,8 @@ function filefilter(
         end
     end
     filter!(x -> gtstartstep(x, startstep, field), filenames)
-    filter(x -> ltstopstep(x, stopstep, field), filenames)
-    sort(files)
+    filter!(x -> ltstopstep(x, stopstep, field), filenames)
+    sort!(filenames, lt=natural)
 end
 
 

@@ -443,8 +443,8 @@ function _PlaneData_from_raw(
     nvars = fieldbytes÷varbytes
     (nvars != length(vars)) && (
         @warn begin
-            "The number of variables in vars is not the number of variables in $file.\n"
-            "Number of variables in $file: \n $nvars"
+            "The number of variables in vars is not the number of variables in $file.\n
+            Number of variables in $file: \n $nvars"
         end
     )
     # Find position of plane in file and read into buffer
@@ -495,8 +495,8 @@ function _PlaneData_from_raw!(
     nvars = fieldbytes÷varbytes
     (nvars != length(vars)) && (
         @warn begin
-            "The number of variables in vars is not the number of variables in $file.\n"
-            "Number of variables in $file: \n $nvars"
+            "The number of variables in vars is not the number of variables in $file.\n
+            Number of variables in $file: \n $nvars"
         end
     )
     # Find position of plane in file and read into buffer
