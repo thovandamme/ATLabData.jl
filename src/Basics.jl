@@ -414,4 +414,46 @@ function crop(
 end
 
 
+function crop(
+        data::PlaneData{T,I};
+        xmin = data.grid.x[1], xmax = data.grid.x[end], 
+        ymin = data.grid.y[1], ymax = data.grid.y[end],
+        zmin = data.grid.z[1], zmax = data.grid.z[end]
+    )::PlaneData{T,I} where {T<:AbstractFloat, I<:Signed}
+    println("Croping ...")
+    printstyled("   "*data.name, "\n", color=:cyan)
+    imin = findmin(abs.(data.grid.x .- xmin))[2]
+    imax = findmin(abs.(data.grid.x .- xmax))[2]
+    jmin = findmin(abs.(data.grid.y .- ymin))[2]
+    jmax = findmin(abs.(data.grid.y .- ymax))[2]
+    kmin = findmin(abs.(data.grid.z .- zmin))[2]
+    kmax = findmin(abs.(data.grid.z .- zmax))[2]
+    if occursin("planesI", data.name) 
+        absmin=jmin; absmax=jmax; ordmin=kmin; ordmax=kmax
+    elseif occursin("planesJ", data.name)
+        absmin=imin; absmax=imax; ordmin=kmin; ordmax=kmax
+    elseif occursin("planesK", data.name)
+        absmin=imin; absmax=imax; ordmin=jmin; ordmax=jmax
+    else
+        error("Do not know how to handle this plane.")
+    end
+    return PlaneData{T,I}(
+        name = "crop($(data.name))",
+        grid = Grid{T,I}(
+            imax + 1 - imin,
+            jmax + 1 - jmin,
+            kmax + 1 - kmin,
+            data.grid.x[imax] - data.grid.x[imin],
+            data.grid.y[jmax] - data.grid.y[jmin],
+            data.grid.z[kmax] - data.grid.z[kmin],
+            data.grid.x[imin:imax],
+            data.grid.y[jmin:jmax],
+            data.grid.z[kmin:kmax]
+        ), 
+        header = data.header,
+        field = data.field[absmin:absmax,ordmin:ordmax]
+    )
+end
+
+
 end
