@@ -40,21 +40,21 @@ needs to the keys in the Dict _vars_. If _vars_ is not given, then it defaults
 to (:u, :v, :w, :b).
 """
 global load(
-    file::String; prec::Type=Float32
-)::ScalarData = _ScalarData_from_file(file, prec)
+    file::String; prec::Type=Float32, verbose::Bool=true
+)::ScalarData = _ScalarData_from_file(file, prec, verbose)
 global load(
-    dir::String, field::String, time::Real; component::String=".0"
-)::ScalarData = load(_file_for_time(dir, time, field, component))
+    dir::String, field::String, time::Real; component::String=".0", verbose::Bool=true
+)::ScalarData = load(_file_for_time(dir, time, field, component), verbose)
 global load(
-    xfile::String, yfile::String, zfile::String; prec::Type=Float32
-)::VectorData = _VectorData_from_files(xfile, yfile, zfile, prec)
+    xfile::String, yfile::String, zfile::String; prec::Type=Float32, verbose::Bool=true
+)::VectorData = _VectorData_from_files(xfile, yfile, zfile, prec, verbose)
 global load(
     file::String, var::String
 )::AveragesData = _AveragesData_from_NetCDF(file, var)
 global load(
     file::String, plane::Int, var::Symbol; prec::Type=Float32, 
-    vars::Dict=Dict(:u=>1, :v=>2, :w=>3, :b=>4, :p=>5)
-) = _PlaneData_from_raw(file, plane, var, prec, vars)
+    vars::Dict=Dict(:u=>1, :v=>2, :w=>3, :b=>4, :p=>5), verbose::Bool=true
+) = _PlaneData_from_raw(file, plane, var, prec, vars, verbose)
 
 
 """
@@ -161,8 +161,8 @@ end
 """
     Loading data that is stored in a single file.
 """
-function _ScalarData_from_file(fieldfile::String, type::Type)::ScalarData
-    verbose("ScalarData", fieldfile)
+function _ScalarData_from_file(fieldfile::String, type::Type, verbose::Bool)::ScalarData
+    do_verbose(verbose, "ScalarData", fieldfile)
     filename = split(fieldfile, "/")[end]
     if startswith(filename, "flow.") || startswith(filename, "scal.")
         return _ScalarData_from_raw(fieldfile, type)
@@ -216,9 +216,9 @@ end
 
 
 # TODO add prec argument to load scal and flow with Float32
-function _ScalarData_from_file!(data::ScalarData, fieldfile::String)
+function _ScalarData_from_file!(data::ScalarData, fieldfile::String, verbose::Bool)
     filename = split(fieldfile, "/")[end]
-    verbose("ScalarData", fieldfile)
+    do_verbose(verbose, "ScalarData", fieldfile)
     data.name = filename
     if startswith(filename, "flow.") || startswith(filename, "scal.")
         try
@@ -248,9 +248,10 @@ function _VectorData_from_files(
         xfieldfile::String,
         yfieldfile::String,
         zfieldfile::String,
-        prec::Type
+        prec::Type,
+        verbose::Bool
     )::VectorData
-    verbose("VectorData", xfieldfile, yfieldfile, zfieldfile)
+    do_verbose(verbose, "VectorData", xfieldfile, yfieldfile, zfieldfile)
     filename = split(xfieldfile, "/")[end]
     if startswith(filename, "flow.") || startswith(filename, "scal.")
         return _VectorData_from_raw(xfieldfile, yfieldfile, zfieldfile, prec)
@@ -303,10 +304,11 @@ function _VectorData_from_files!(
         data::VectorData, 
         xfieldfile::String,
         yfieldfile::String,
-        zfieldfile::String
+        zfieldfile::String,
+        verbose::Bool
     )
     filename = split(xfieldfile, "/")[end]
-    verbose("VectorData", xfieldfile, yfieldfile, zfieldfile)
+    do_verbose(verbose, "VectorData", xfieldfile, yfieldfile, zfieldfile)
     data.name = string(splitpath(xfieldfile)[end][1:end-2])
     if startswith(filename, "flow.") || startswith(filename, "scal.")
         try 
@@ -393,7 +395,7 @@ end
 #                               PlaneData
 # ------------------------------------------------------------------------------
 function _PlaneData_from_raw(
-        file::String, plane::Int, var::Symbol, prec::Type, vars::Dict
+        file::String, plane::Signed, var::Symbol, prec::Type, vars::Dict, verbose::Bool
     )::PlaneData{prec,Int32}
     # Inspired by planes2planes.py from atlab
     """
@@ -403,6 +405,7 @@ function _PlaneData_from_raw(
         The dictinoary vars containes the indices for the varibales, that can be 
             given by var.
     """
+    do_verbose(verbose, "PlaneData", file)
     !haskey(vars, var) && error("var has to be a key of the dictionary vars.")
     grid = convert(prec, loadgrid(joinpath(dirname(file), "grid")))
     planesize = 0; n1 = 0; n2 = 0
@@ -636,16 +639,19 @@ function _file_for_time(
 end
 
 
-function verbose(dtype::String, files...; save::Bool=false)
-    if !save
-        text = "Loading " * dtype * " ..."
-    else
-        text = "Saving " * dtype * " ..."
+function do_verbose(verbose, dtype::String, files...; save::Bool=false)
+    if verbose
+        if !save
+            text = "Loading " * dtype * " ..."
+        else
+            text = "Saving " * dtype * " ..."
+        end
+        println(text)
+        for file in files
+            printstyled("   "*file*"\n", color=:cyan)
+        end
     end
-    println(text)
-    for file in files
-        printstyled("   "*file*"\n", color=:cyan)
-    end
+    return nothing
 end
 
 

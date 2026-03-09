@@ -384,10 +384,13 @@ function crop(
         data::ScalarData;
         xmin = data.grid.x[1], xmax = data.grid.x[end], 
         ymin = data.grid.y[1], ymax = data.grid.y[end],
-        zmin = data.grid.z[1], zmax = data.grid.z[end]
+        zmin = data.grid.z[1], zmax = data.grid.z[end],
+        verbose::Bool = true
     )::ScalarData
-    println("Croping ...")
-    printstyled("   "*data.name, "\n", color=:cyan)
+    verbose && (
+        println("Croping ...");
+        printstyled("   "*data.name, "\n", color=:cyan)
+    )
     imin = findmin(abs.(data.grid.x .- xmin))[2]
     imax = findmin(abs.(data.grid.x .- xmax))[2]
     jmin = findmin(abs.(data.grid.y .- ymin))[2]
@@ -418,10 +421,13 @@ function crop(
         data::PlaneData{T,I};
         xmin = data.grid.x[1], xmax = data.grid.x[end], 
         ymin = data.grid.y[1], ymax = data.grid.y[end],
-        zmin = data.grid.z[1], zmax = data.grid.z[end]
+        zmin = data.grid.z[1], zmax = data.grid.z[end],
+        verbose::Bool = true
     )::PlaneData{T,I} where {T<:AbstractFloat, I<:Signed}
-    println("Croping ...")
-    printstyled("   "*data.name, "\n", color=:cyan)
+    verbose && (
+        println("Croping ...");
+        printstyled("   "*data.name, "\n", color=:cyan)
+    )
     imin = findmin(abs.(data.grid.x .- xmin))[2]
     imax = findmin(abs.(data.grid.x .- xmax))[2]
     jmin = findmin(abs.(data.grid.y .- ymin))[2]
