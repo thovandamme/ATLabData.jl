@@ -268,7 +268,7 @@ function _VectorData_from_raw(
         T::Type
     )::VectorData{T, Int32}
     grid = convert(T,_Grid_from_file(dirname(xfieldfile)))
-    field = Array{T}(undef, 4, grid.nx, grid.ny, grid.nz)
+    field = Array{T}(undef, 3, grid.nx, grid.ny, grid.nz)
     field[1,:,:,:], t = _Array_from_rawfile(grid, xfieldfile)
     field[2,:,:,:] .= _Array_from_rawfile(grid, yfieldfile)[1]
     field[3,:,:,:] .= _Array_from_rawfile(grid, zfieldfile)[1]
@@ -287,7 +287,7 @@ function _VectorData_from_visuals(
         zfieldfile::String
     )
     grid = convert(Float32, _Grid_from_file(dirname(xfieldfile)))
-    field = Array{T}(undef, 4, grid.nx, grid.ny, grid.nz)
+    field = Array{T}(undef, 3, grid.nx, grid.ny, grid.nz)
     field[1,:,:,:] .= _Array_from_file(grid, xfieldfile)
     field[2,:,:,:] .= _Array_from_file(grid, yfieldfile)
     field[3,:,:,:] .= _Array_from_file(grid, zfieldfile)
