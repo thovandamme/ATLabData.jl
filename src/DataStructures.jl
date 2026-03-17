@@ -73,7 +73,7 @@ end
     grid::Grid{T,I}
     iteration::Int32 = Int32(-1)
     time::T
-    field::Array{T,4}
+    field::Array{T,3}
 end
 
 
