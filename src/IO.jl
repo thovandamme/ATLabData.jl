@@ -335,13 +335,17 @@ end
 # ------------------------------------------------------------------------------
 #                         Array from binary
 # ------------------------------------------------------------------------------
+# Note, that field data from atlab is either stored as Float32 or Float64, 
+# but usually in Float32 (espicially for large simulations).
+# Headers store floats always as Float64 and integers as Int32.
+
 """
     Load array from a binary file according to the information in _grid_.
 """
 function _Array_from_file(
         grid::Grid{T,I}, fieldfile::String
     )::Array{T,3} where {T<:AbstractFloat, I<:Signed}
-    buffer = Vector{T}(undef, grid.nx*grid.ny*grid.nz)
+    buffer = Vector{T}(undef, Int(grid.nx)*Int(grid.ny)*Int(grid.nz))
     read!(fieldfile, buffer)
     return reshape(buffer, (grid.nx, grid.ny, grid.nz))
 end
@@ -360,7 +364,7 @@ function _Array_from_rawfile(
     seek(io, 5*sizeof(headersize))
     time = read(io, Float64)
     seek(io, headersize) # Jump to first last entry belonging to the header
-    buffer = Vector{T}(undef, grid.nx*grid.ny*grid.nz)
+    buffer = Vector{T}(undef, Int(grid.nx)*Int(grid.ny)*Int(grid.nz))
     read!(io, buffer)
     close(io)
     return reshape(buffer, (grid.nx, grid.ny, grid.nz)), time
@@ -370,7 +374,7 @@ end
 function _Array_from_rawfile_(
         io::IOStream, h::FieldHeader{T,I}
     )::Array{T, 3} where {T<:AbstractFloat, I<:Signed}
-    buffer = Vector{T}(undef, h.nx*h.ny*h.nz)
+    buffer = Vector{T}(undef, Int(h.nx)*Int(h.ny)*Int(h.nz))
     seek(io, h.headersize)
     read!(io, buffer)
     close(io)
@@ -411,21 +415,21 @@ function _PlaneData_from_raw(
     planesize = 0; n1 = 0; n2 = 0
     filename = basename(file)
     if split(filename, ".")[1]=="planesI"
-        planesize = grid.ny*grid.nz
+        planesize = Int(grid.ny)*Int(grid.nz)
         grid.nx = 1
         val = grid.x[plane]
         grid.x = ones(prec, 1)*val
         n1 = grid.ny
         n2 = grid.nz
     elseif split(filename, ".")[1]=="planesJ"
-        planesize = grid.nx*grid.nz
+        planesize = Int(grid.nx)*Int(grid.nz)
         grid.ny = 1
         val = grid.y[plane]
         grid.y = ones(prec, 1)*val
         n1 = grid.nx
         n2 = grid.nz
     elseif split(filename, ".")[1]=="planesK"
-        planesize = grid.nx*grid.ny
+        planesize = Int(grid.nx)*Int(grid.ny)
         grid.nz = 1
         val = grid.z[plane]
         grid.z = ones(prec, 1)*val
