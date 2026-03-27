@@ -14,8 +14,14 @@ include("IO.jl")
 include("Basics.jl")
 @reexport using .Basics
 
-include("Analysis.jl")
-@reexport using .Analysis
+# include("Analysis.jl")
+# @reexport using .Analysis
+
+include("FDM.jl")
+using .FDM
+
+include("Calculus.jl")
+@reexport using .Calculus
 
 include("Statistics.jl")
 @reexport using .Statistics

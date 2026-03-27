@@ -191,6 +191,22 @@ end
 
 
 """
+    wave(data)
+Wave-turbulence decomposition: Computes the wave part of __data__ assuming 
+that the wave in symmetric in the second index (plane wave in the first and 
+third index). The wave is then the mean in the direction of the second index.
+"""
+function wave(data::ScalarData{T,I})::ScalarData where {T<:AbstractFloat, I<:Signed}
+    return ScalarData{T,I}(
+        name = "wave($(data.name))",
+        grid = data.grid,
+        time = data.time,
+        field = mean(data.field, dims=2) .* ones(T, size(data.field))
+    )
+end
+
+
+"""
     wave(data, mode)
 Wave-turbulence decomposition: Computes the wave part of __data__ regarding the 
 __mode__. Utilizes phase-avering.

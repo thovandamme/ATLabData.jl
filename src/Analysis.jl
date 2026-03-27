@@ -1,3 +1,5 @@
+# Depricated
+
 module Analysis
 
 using ..DataStructures

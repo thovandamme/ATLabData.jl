@@ -1,6 +1,6 @@
 module Physics
 
-using ..DataStructures, ..IO, ..Basics, ..Statistics, ..Analysis
+using ..DataStructures, ..IO, ..Basics, ..Statistics, ..Calculus
 
 using ForwardDiff
 
