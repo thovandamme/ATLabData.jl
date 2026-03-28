@@ -33,8 +33,9 @@ global function ∂x(
     )::ScalarData{T,I} where {T<:AbstractFloat, I<:Signed}
     verbose && do_verbose("derivative in x")
     res = similar(data.field)
-    w = weights(data.grid.x, stencil_size)
-    fornberg_method_x!(res, data.field, w, stencil_size)
+    weights = get_weights(data.grid.x, stencil_size)
+    stencils = get_stencils(data.grid.nx, stencil_size)
+    fornberg_method_x!(res, data.field, weights, stencils)
     return ScalarData(
         name = "∂₁($(data.name))",
         grid = data.grid,
@@ -49,8 +50,9 @@ global function ∂x!(
         res::ScalarData{T,I}, data::ScalarData{T,I}; stencil_size=7, verbose=true
     )::ScalarData{T,I} where {T<:AbstractFloat, I<:Signed}
     verbose && do_verbose("derivative in x")
-    w = weights(data.grid.x, stencil_size)
-    fornberg_method_x!(res.field, data.field, w, stencil_size)
+    weights = get_weights(data.grid.x, stencil_size)
+    stencils = get_stencils(data.grid.nx, stencil_size)
+    fornberg_method_x!(res.field, data.field, weights, stencils)
     return nothing
 end
 
@@ -60,8 +62,9 @@ global function ∂y(
     )::ScalarData{T,I} where {T<:AbstractFloat, I<:Signed}
     verbose && do_verbose("derivative in y")
     res = similar(data.field)
-    w = weights(data.grid.y, stencil_size)
-    fornberg_method_y!(res, data.field, w, stencil_size)
+    weights = get_weights(data.grid.y, stencil_size)
+    stencils = get_stencils(data.grid.ny, stencil_size)
+    fornberg_method_y!(res, data.field, weights, stencils)
     return ScalarData(
         name = "∂₂($(data.name))",
         grid = data.grid,
@@ -76,8 +79,9 @@ global function ∂y!(
         res::ScalarData{T,I}, data::ScalarData{T,I}; stencil_size=7, verbose=true
     )::ScalarData{T,I} where {T<:AbstractFloat, I<:Signed}
     verbose && do_verbose("derivative in y")
-    w = weights(data.grid.y, stencil_size)
-    fornberg_method_y!(res.field, data.field, w, stencil_size)
+    weights = get_weights(data.grid.y, stencil_size)
+    stencils = get_stencils(data.grid.ny, stencil_size)
+    fornberg_method_y!(res.field, data.field, weights, stencils)
     return nothing
 end
 
@@ -87,8 +91,9 @@ global function ∂z(
     )::ScalarData{T,I} where {T<:AbstractFloat, I<:Signed}
     verbose && do_verbose("derivative in z")
     res = similar(data.field)
-    w = weights(data.grid.z, stencil_size)
-    fornberg_method_z!(res, data.field, w, stencil_size)
+    weights = get_weights(data.grid.z, stencil_size)
+    stencils = get_stencils(data.grid.nz, stencil_size)
+    fornberg_method_z!(res, data.field, weights, stencils)
     return ScalarData(
         name = "∂₃($(data.name))",
         grid = data.grid,
@@ -103,8 +108,9 @@ global function ∂z!(
         res::ScalarData{T,I}, data::ScalarData{T,I}; stencil_size=7, verbose=true
     )::ScalarData{T,I} where {T<:AbstractFloat, I<:Signed}
     verbose && do_verbose("derivative in z")
-    w = weights(data.grid.z, stencil_size)
-    fornberg_method_z!(res.field, data.field, w, stencil_size)
+    weights = get_weights(data.grid.z, stencil_size)
+    stencils = get_stencils(data.grid.nz, stencil_size)
+    fornberg_method_z!(res.field, data.field, weights, stencils)
     return nothing
 end
 
@@ -144,31 +150,9 @@ global function gradient!(
     if data.grid.ny > 1
         gradient3D!(res.field, data, stencil_size)
     else
-        _gradient2D!(res.field, data, stencil_size)
+        gradient2D!(res.field, data, stencil_size)
     end
     res.name = "∇($(data.name))"
-    return nothing
-end
-
-
-function _gradient3D!(
-        res::Array{T,4}, data::ScalarData{T,I}, stencil_size::Signed
-    ) where {T<:AbstractFloat, I<:Signed}
-    weights_x = weights(data.grid.x, stencil_size)
-    weights_y = weights(data.grid.y, stencil_size)
-    weights_z = weights(data.grid.z, stencil_size)
-    x_stencils = get_stencils(data.grid.nx, stencil_size)
-    y_stencils = get_stencils(data.grid.ny, stencil_size)
-    z_stencils = get_stencils(data.grid.nz, stencil_size)
-    @inbounds @batch for k ∈ eachindex(data.grid.z)
-        for j ∈ eachindex(data.grid.y)
-            for i ∈ eachindex(data.grid.x)
-                res[1,i,j,k] = sum(weights_x[i] .* data.field[x_stencils[i],j,k])
-                res[2,i,j,k] = sum(weights_y[i] .* data.field[i,y_stencils[j],k])
-                res[3,i,j,k] = sum(weights_z[i] .* data.field[i,j,z_stencils[k]])
-            end
-        end
-    end    
     return nothing
 end
 
@@ -176,49 +160,28 @@ end
 function gradient3D!(
         res::Array{T,4}, data::ScalarData{T,I}, stencil_size::Signed
     ) where {T<:AbstractFloat, I<:Signed}
-    weights_x = weights(data.grid.x, stencil_size)
-    weights_y = weights(data.grid.y, stencil_size)
-    weights_z = weights(data.grid.z, stencil_size)
-    # fornberg_method_x!(res[1,:,:,:], data.field, weights_x, stencil_size)
-    # fornberg_method_y!(res[2,:,:,:], data.field, weights_y, stencil_size)
-    # fornberg_method_z!(res[3,:,:,:], data.field, weights_z, stencil_size)
-    fornberg_method!(
-        view(res, 1, :, :, :), 
-        view(res, 2, :, :, :), 
-        view(res, 3, :, :, :), 
-        data.field, weights_x, weights_y, weights_z, stencil_size
-    )
-    return nothing
-end
-
-
-# _gradient2D!() has somehow much more allocations than gradient2D!()
-function _gradient2D!(
-        res::Array{T,4}, data::ScalarData{T,I}, stencil_size::Signed
-    ) where {T<:AbstractFloat, I<:Signed}
-    weights_x = weights(data.grid.x, stencil_size)
-    weights_z = weights(data.grid.z, stencil_size)
+    weights_x = get_weights(data.grid.x, stencil_size)
+    weights_y = get_weights(data.grid.y, stencil_size)
+    weights_z = get_weights(data.grid.z, stencil_size)
     x_stencils = get_stencils(data.grid.nx, stencil_size)
+    y_stencils = get_stencils(data.grid.ny, stencil_size)
     z_stencils = get_stencils(data.grid.nz, stencil_size)
-    @inbounds @batch for k ∈ eachindex(data.grid.z)
-        for j ∈ eachindex(data.grid.y)
-            for i ∈ eachindex(data.grid.x)
-                res[1,i,j,k] = sum(weights_x[i] .* data.field[x_stencils[i],j,k])
-                res[2,i,j,k] = sum(weights_z[i] .* data.field[i,j,z_stencils[k]])
-            end
-        end
-    end    
+    fornberg_method_x!(view(res, 1, :, :, :), data.field, weights_x, x_stencils)
+    fornberg_method_y!(view(res, 2, :, :, :), data.field, weights_y, y_stencils)
+    fornberg_method_z!(view(res, 3, :, :, :), data.field, weights_z, z_stencils)
     return nothing
 end
 
 
 function gradient2D!(
-        res::Array{T}, data::ScalarData{T,I}, stencil_size::Signed
+        res::Array{T,4}, data::ScalarData{T,I}, stencil_size::Signed
     ) where {T<:AbstractFloat, I<:Signed}
-    weights_x = weights(data.grid.x, stencil_size)
-    weights_z = weights(data.grid.z, stencil_size)
-    fornberg_method_x!(res[1,:,:,:], data.field, weights_x, stencil_size)
-    fornberg_method_z!(res[3,:,:,:], data.field, weights_z, stencil_size)
+    weights_x = get_weights(data.grid.x, stencil_size)
+    weights_z = get_weights(data.grid.z, stencil_size)
+    x_stencils = get_stencils(data.grid.nx, stencil_size)
+    z_stencils = get_stencils(data.grid.nz, stencil_size)
+    fornberg_method_x!(view(res, 1, :, :, :), data.field, weights_x, x_stencils)
+    fornberg_method_z!(view(res, 2, :, :, :), data.field, weights_z, z_stencils)
     return nothing
 end
 
@@ -267,13 +230,13 @@ global function curl!(
 end
 
 
-# TODO How to do the curl without extra allocations using FDM module?
+# TODO
 function curl3D!(
         res::Array{T,4}, data::VectorData{T,I}, stencil_size::Signed
     ) where {T<:AbstractFloat, I<:Signed}
-    weights_x = weights(data.grid.x, stencil_size)
-    weights_y = weights(data.grid.y, stencil_size)
-    weights_z = weights(data.grid.z, stencil_size)
+    weights_x = get_weights(data.grid.x, stencil_size)
+    weights_y = get_weights(data.grid.y, stencil_size)
+    weights_z = get_weights(data.grid.z, stencil_size)
     x_stencils = get_stencils(data.grid.nx, stencil_size)
     y_stencils = get_stencils(data.grid.ny, stencil_size)
     z_stencils = get_stencils(data.grid.nz, stencil_size)
@@ -294,61 +257,11 @@ function curl3D!(
 end
 
 
-# This method is much slower
-function _curl3D!(
-        res::Array{T}, data::VectorData{T,I}
-    ) where {T<:AbstractFloat, I<:Signed} 
-    @inline function ∂(fieldk, dir, i, j, k)
-        dx = data.grid.x[i+1] - data.grid.x[i-1]
-        dy = data.grid.y[j+1] - data.grid.y[j-1]
-        dz = data.grid.z[k+1] - data.grid.z[k-1]
-        if dir == 1
-            return (fieldk[i+1,j,k] - fieldk[i-1,j,k]) / dx
-        elseif dir == 2
-            return (fieldk[i,j+1,k] - fieldk[i,j-1,k]) / dy
-        elseif dir == 3
-            return (fieldk[i,j,k+1] - fieldk[i,j,k-1]) / dz
-        else
-            error("field does not have this component")
-        end
-    end 
-    @inbounds @batch for k ∈ 2:data.grid.nz-1
-        for j ∈ 2:data.grid.ny-1
-            for i ∈ 2:data.grid.nx-1
-                for α ∈ 1:3 # curl index
-                    for β ∈ 1:3 # derivate index
-                        for γ ∈ 1:3 # field index 
-                            ε = levi_civita(α, β, γ)
-                            ε==0 && continue
-                            res[α,i,j,k] += ε*∂(
-                                view(data.field, γ, :, :, :), β, i, j, k
-                            )
-                        end
-                    end
-                end
-            end
-        end
-    end
-    return nothing
-end
-
-
-@inline function levi_civita(i::Int, j::Int, k::Int)
-    if i == j || j == k || i == k
-        return 0
-    elseif (i, j, k) in ((1,2,3), (2,3,1), (3,1,2))
-        return 1
-    else
-        return -1
-    end
-end
-
-
 function curl2D!(
         res::Array{T}, data::VectorData{T,I}, stencil_size::Signed
     ) where {T<:AbstractFloat, I<:Signed}
-    weights_x = weights(data.grid.x, stencil_size)
-    weights_z = weights(data.grid.z, stencil_size)
+    weights_x = get_weights(data.grid.x, stencil_size)
+    weights_z = get_weights(data.grid.z, stencil_size)
     x_stencils = get_stencils(data.grid.nx, stencil_size)
     z_stencils = get_stencils(data.grid.nz, stencil_size)
     @inbounds @batch for k ∈ eachindex(data.grid.z)
@@ -402,9 +315,9 @@ end
 function divergence3D!(
         res::Array{T}, data::VectorData{T,I}, stencil_size::Signed
     ) where {T<:AbstractFloat, I<:Signed}
-    weights_x = weights(data.grid.x, stencil_size)
-    weights_y = weights(data.grid.y, stencil_size)
-    weights_z = weights(data.grid.z, stencil_size)
+    weights_x = get_weights(data.grid.x, stencil_size)
+    weights_y = get_weights(data.grid.y, stencil_size)
+    weights_z = get_weights(data.grid.z, stencil_size)
     buffer = similar(res)
     fornberg_method_x!(res, data.field, weights_x, stencil_size)
     fornberg_method_y!(buffer, data.field, weights_y, stencil_size)
@@ -418,8 +331,8 @@ end
 function divergence2D!(
         res::Array{T}, data::VectorData{T,I}
     ) where {T<:AbstractFloat, I<:Signed}
-    weights_x = weights(data.grid.x, stencil_size)
-    weights_z = weights(data.grid.z, stencil_size)
+    weights_x = get_weights(data.grid.x, stencil_size)
+    weights_z = get_weights(data.grid.z, stencil_size)
     buffer = similar(res)
     fornberg_method_x!(res, data.field, weights_x, stencil_size)
     fornberg_method_z!(buffer, data.field, weights_z, stencil_size)

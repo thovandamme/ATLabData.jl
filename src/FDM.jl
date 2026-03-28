@@ -1,17 +1,18 @@
 module FDM
 
 using Polyester
+using LoopVectorization
 
-export weights, get_stencils
+export get_weights, get_stencils
 export fornberg_method!, fornberg_method_x!, fornberg_method_y!, fornberg_method_z!
 
 
 let
     """
-        weights(axis, stencil_size)
+        get_weights(axis, stencil_size)
     Initialize the Fornberg weights along a complete axis with stencil size.
     """
-    global function weights(
+    global function get_weights(
             axis::Vector{T}, stencil_size::Signed
         )::Vector{Vector{<:AbstractFloat}} where {T<:AbstractFloat}
         nx = length(axis)
@@ -76,66 +77,52 @@ let
 end
 
 
-# Applies differentiation in all three dimensions within one loop to 
-# avoid multi-threading overhead compared to calling fornberg_method_x/y/z 
-# separately. Usefull for gradient computation.
-function fornberg_method!(
-        resx::Array{T,3},
-        resy::Array{T,3},
-        resz::Array{T,3},
-        field::Array{T,3},
-        weights_x::Vector{Vector{<:AbstractFloat}},
-        weights_y::Vector{Vector{<:AbstractFloat}},
-        weights_z::Vector{Vector{<:AbstractFloat}},
-    ) where {T<:AbstractFloat}
-    nx, ny, nz = size(field)
-    x_stencils = get_stencils(nx, stencil_size)
-    y_stencils = get_stencils(ny, stencil_size)
-    z_stencils = get_stencils(nz, stencil_size)
-    @inbounds @batch for k ∈ 1:nz
-        for j ∈ 1:ny
-            for i ∈ 1:nx
-                resx[i,j,k] = sum(weights_x[i] .* field[x_stencils[i],j,k])
-                resy[i,j,k] = sum(weights_y[i] .* field[i,y_stencils[j],k])
-                resz[i,j,k] = sum(weights_z[i] .* field[i,j,z_stencils[k]])
-            end
-        end
-    end
-    return nothing
-end
-
-
+# TODO Optimize - is there a variant which can @turbo the inner loop without 
+# the additional buffers?
 function fornberg_method_x!(
-        res::Array{T,3},
-        field::Array{T,3}, 
+        res::AbstractArray{T,3},
+        field::AbstractArray{T,3}, 
         weights::Vector{Vector{<:AbstractFloat}},
-        stencil_size::Signed
+        stencils::Vector{UnitRange}
     ) where {T<:AbstractFloat}
     nx, ny, nz = size(field)
-    stencils = get_stencils(nx, stencil_size)
-    @inbounds @batch for k ∈ eachindex(1:nz)
-        for j ∈ eachindex(1:ny)
-            for i ∈ eachindex(1:nx)
-                res[i,j,k] = sum(weights[i] .* field[stencils[i],j,k])
+    fill!(res, zero(T))
+    res_buffer = permutedims(res, [2,3,1])
+    field_buffer = permutedims(field, [2,3,1])
+    @inbounds @batch for i ∈ 1:nx
+        w = weights[i]
+        stencil = stencils[i]
+        for is ∈ eachindex(stencil)
+            h = stencil[is]
+            for k ∈ 1:nz
+                @turbo for j ∈ 1:ny
+                    @inbounds res_buffer[j,k,i] += w[is]*field_buffer[j,k,h]
+                end
             end
         end
     end
+    permutedims!(res, res_buffer, [3,1,2])
     return nothing
 end
 
 
 function fornberg_method_y!(
-        res::Array{T,3},
-        field::Array{T,3}, 
+        res::AbstractArray{T,3},
+        field::AbstractArray{T,3}, 
         weights::Vector{Vector{<:AbstractFloat}},
-        stencil_size::Signed
+        stencils::Vector{UnitRange}
     ) where {T<:AbstractFloat}
     nx, ny, nz = size(field)
-    stencils = get_stencils(ny, stencil_size)
-    @inbounds @batch for k ∈ eachindex(1:nz)
-        for j ∈ eachindex(1:ny)
-            for i in eachindex(1:nx)
-                res[i,j,k] = sum(weights[j] .* field[i,stencils[j],k])
+    fill!(res, zero(T))
+    @inbounds @batch for k ∈ 1:nz
+        for j ∈ 1:ny
+            w = weights[j]
+            stencil = stencils[j]
+            for is ∈ eachindex(stencil)
+                h = stencil[is]
+                @turbo for i ∈ 1:nx
+                    @inbounds res[i,j,k] += w[is]*field[i,h,k]
+                end
             end
         end
     end
@@ -144,17 +131,22 @@ end
 
 
 function fornberg_method_z!(
-        res::Array{T,3},
-        field::Array{T,3}, 
+        res::AbstractArray{T,3},
+        field::AbstractArray{T,3}, 
         weights::Vector{Vector{<:AbstractFloat}},
-        stencil_size::Signed
+        stencils::Vector{UnitRange}
     ) where {T<:AbstractFloat}
     nx, ny, nz = size(field)
-    stencils = get_stencils(nz, stencil_size)
-    @inbounds @batch for k ∈ eachindex(1:nz)
-        for j ∈ eachindex(1:ny)
-            for i in eachindex(1:nx)
-                res[i,j,k] = sum(weights[k] .* field[i,j,stencils[k]])
+    fill!(res, zero(T))
+    @inbounds @batch for k ∈ 1:nz
+        w = weights[k]
+        stencil = stencils[k]
+        for is ∈ eachindex(stencil)
+            h = stencil[is]
+            for j ∈ 1:ny
+                @turbo for i ∈ 1:nx
+                    @inbounds res[i,j,k] += w[is]*field[i,j,h]
+                end
             end
         end
     end
