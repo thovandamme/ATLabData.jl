@@ -16,6 +16,7 @@ using ..FDM
 using Polyester
 
 export ∂x, ∂y, ∂z, ∂x!, ∂y!, ∂z!
+export ∂x², ∂y², ∂z², ∂x2, ∂y2, ∂z2
 export gradient, gradient!, curl, curl!, divergence, divergence!
 
 
@@ -28,6 +29,52 @@ end
 ################################################################################
 #                   Simple derivatives in one direction
 ################################################################################
+
+# Derivatives of 1D data
+global function ∂x(
+        data::Vector{T}, axis::Vector{T}; stencil_size=7, verbose=true
+    )::Vector{T} where {T<:AbstractFloat}
+    verbose && do_verbose("1D derivative")
+    res = similar(data)
+    weights = get_weights(axis, stencil_size)
+    stencils = get_stencils(length(axis), stencil_size)
+    fornberg_method_1D!(res, data, weights, stencils)
+    return res
+end
+
+
+global function ∂x²(
+        data::Vector{T}, axis::Vector{T}; stencil_size=7, verbose=true
+    )::Vector{T} where {T<:AbstractFloat}
+    verbose && do_verbose("2nd-order 1D derivative")
+    res = similar(data)
+    weights = get_weights(axis, stencil_size, order=2)
+    stencils = get_stencils(length(axis), stencil_size)
+    fornberg_method_1D!(res, data, weights, stencils)
+    return res
+end
+global ∂x2(args...; kwargs...) = ∂x²(args...; kwargs...)
+
+
+global ∂y(
+    data::Vector{T}, axis::Vector{T}; stencil_size=7, verbose=true
+) where {T<:AbstractFloat} = ∂x(data, axis, stencil_size=stencil_size, verbose=verbose)
+global ∂y²(
+    data::Vector{T}, axis::Vector{T}; stencil_size=7, verbose=true
+) where {T<:AbstractFloat} = ∂x²(data, axis, stencil_size=stencil_size, verbose=verbose)
+global ∂y2(args...; kwargs...) = ∂y²(args...; kwargs...)
+
+
+global ∂z(
+    data::Vector{T}, axis::Vector{T}; stencil_size=7, verbose=true
+) where {T<:AbstractFloat} = ∂x(data, axis, stencil_size=stencil_size, verbose=verbose)
+global ∂z²(
+    data::Vector{T}, axis::Vector{T}; stencil_size=7, verbose=true
+) where {T<:AbstractFloat} = ∂x²(data, axis, stencil_size=stencil_size, verbose=verbose)
+global ∂z2(args...; kwargs...) = ∂z²(args...; kwargs...)
+
+
+# Derivatives of ScalarData
 global function ∂x(
         data::ScalarData{T,I}; stencil_size=7, verbose=true
     )::ScalarData{T,I} where {T<:AbstractFloat, I<:Signed}
@@ -282,11 +329,11 @@ global function divergence(
         data::VectorData{T,I}; stencil_size=7, verbose=true
     )::ScalarData{T,I} where {T<:AbstractFloat, I<:Signed}
     verbose && do_verbose("divergence")
-    res = Array{T}(undef, 3, data.grid.nx, data.grid.ny, data.grid.nz)
+    res = Array{T}(undef, data.grid.nx, data.grid.ny, data.grid.nz)
     if data.grid.ny > 1
         divergence3D!(res, data, stencil_size)
     else
-        divergence2D!(res, data)
+        divergence2D!(res, data, stencil_size)
     end
     return ScalarData(
         name = "∇⋅($(data.name))",
@@ -300,12 +347,12 @@ end
 
 global function divergence!(
         res::ScalarData{T,I}, data::VectorData{T,I}; stencil_size=7, verbose=true
-    )::ScalarData{T,I} where {T<:AbstractFloat, I<:Signed}
+    ) where {T<:AbstractFloat, I<:Signed}
     verbose && do_verbose("divergence")
     if data.grid.ny > 1
         divergence3D!(res.field, data, stencil_size)
     else
-        divergence2D!(res.field, data)
+        divergence2D!(res.field, data, stencil_size)
     end
     res.name = "∇⋅($(data.name))"
     return nothing
@@ -318,24 +365,29 @@ function divergence3D!(
     weights_x = get_weights(data.grid.x, stencil_size)
     weights_y = get_weights(data.grid.y, stencil_size)
     weights_z = get_weights(data.grid.z, stencil_size)
+    stencils_x = get_stencils(data.grid.nx, stencil_size)
+    stencils_y = get_stencils(data.grid.ny, stencil_size)
+    stencils_z = get_stencils(data.grid.nz, stencil_size)
     buffer = similar(res)
-    fornberg_method_x!(res, data.field, weights_x, stencil_size)
-    fornberg_method_y!(buffer, data.field, weights_y, stencil_size)
+    fornberg_method_x!(res, view(data.field, 1, :, :, :), weights_x, stencils_x)
+    fornberg_method_y!(buffer, view(data.field, 2, :, :, :), weights_y, stencils_y)
     res .+= buffer
-    fornberg_method_z!(buffer, data.field, weights_z, stencil_size)
+    fornberg_method_z!(buffer, view(data.field, 3, :, :, :), weights_z, stencils_z)
     res .+= buffer
     return nothing
 end
 
 
 function divergence2D!(
-        res::Array{T}, data::VectorData{T,I}
+        res::Array{T}, data::VectorData{T,I}, stencil_size::Signed
     ) where {T<:AbstractFloat, I<:Signed}
     weights_x = get_weights(data.grid.x, stencil_size)
     weights_z = get_weights(data.grid.z, stencil_size)
+    stencils_x = get_stencils(data.grid.nx, stencil_size)
+    stencils_z = get_stencils(data.grid.nz, stencil_size)
     buffer = similar(res)
-    fornberg_method_x!(res, data.field, weights_x, stencil_size)
-    fornberg_method_z!(buffer, data.field, weights_z, stencil_size)
+    fornberg_method_x!(res, view(data.field, 1, :, :, :), weights_x, stencils_x)
+    fornberg_method_z!(buffer, view(data.field, 3, :, :, :), weights_z, stencils_z)
     res .+= buffer
     return nothing
 end

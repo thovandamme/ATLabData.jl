@@ -63,8 +63,8 @@ Version of _load_ for preallocated data container. This function does not
     update the grid attribute!
 """
 global load!(
-    data::ScalarData{T,I}, file::String
-) where {T<:AbstractFloat, I<:Signed} = _ScalarData_from_file!(data, file)
+    data::ScalarData{T,I}, file::String; verbose=true
+) where {T<:AbstractFloat, I<:Signed} = _ScalarData_from_file!(data, file, verbose)
 global load!(
     data::VectorData{T,I}, xfile::String, yfile::String, zfile::String
 ) where {T<:AbstractFloat, I<:Signed} = _VectorData_from_file!(data, xfile, yfile, zfile)

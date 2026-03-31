@@ -4,7 +4,7 @@ using Polyester
 using LoopVectorization
 
 export get_weights, get_stencils
-export fornberg_method!, fornberg_method_x!, fornberg_method_y!, fornberg_method_z!
+export fornberg_method_1D!, fornberg_method_x!, fornberg_method_y!, fornberg_method_z!
 
 
 let
@@ -13,7 +13,7 @@ let
     Initialize the Fornberg weights along a complete axis with stencil size.
     """
     global function get_weights(
-            axis::Vector{T}, stencil_size::Signed
+            axis::Vector{T}, stencil_size::Signed; order=1
         )::Vector{Vector{<:AbstractFloat}} where {T<:AbstractFloat}
         nx = length(axis)
         res = Vector{Vector{<:AbstractFloat}}(undef, nx)
@@ -28,7 +28,7 @@ let
                     imin, imax = nx-stencil_size+1, nx
                 end
             end
-            res[i] = fdweights(axis[imin:imax] .- axis[i], 1)
+            res[i] = fdweights(axis[imin:imax] .- axis[i], order)
         end
         return res
     end
@@ -148,6 +148,25 @@ function fornberg_method_z!(
                     @inbounds res[i,j,k] += w[is]*field[i,j,h]
                 end
             end
+        end
+    end
+    return nothing
+end
+
+
+function fornberg_method_1D!(
+        res::AbstractArray{T,1},
+        field::AbstractArray{T,1},
+        weights::Vector{Vector{<:AbstractFloat}},
+        stencils::Vector{UnitRange}
+    ) where {T<:AbstractFloat}
+    fill!(res, zero(T))
+    @inbounds for i ∈ eachindex(field)
+        w = weights[i]
+        stencil = stencils[i]
+        for is ∈ eachindex(stencil)
+            h = stencil[is]
+            res[i] += w[is]*field[h]
         end
     end
     return nothing
