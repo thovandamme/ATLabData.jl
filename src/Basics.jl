@@ -418,6 +418,43 @@ end
 
 
 function crop(
+        data::VectorData;
+        xmin = data.grid.x[1], xmax = data.grid.x[end], 
+        ymin = data.grid.y[1], ymax = data.grid.y[end],
+        zmin = data.grid.z[1], zmax = data.grid.z[end],
+        verbose::Bool = true
+    )::VectorData
+    verbose && (
+        println("Croping ...");
+        printstyled("   "*data.name, "\n", color=:cyan)
+    )
+    imin = findmin(abs.(data.grid.x .- xmin))[2]
+    imax = findmin(abs.(data.grid.x .- xmax))[2]
+    jmin = findmin(abs.(data.grid.y .- ymin))[2]
+    jmax = findmin(abs.(data.grid.y .- ymax))[2]
+    kmin = findmin(abs.(data.grid.z .- zmin))[2]
+    kmax = findmin(abs.(data.grid.z .- zmax))[2]
+    return VectorData(
+        name = "crop($(data.name))",
+        grid = Grid{eltype(data)[1], eltype(data)[2]}(
+            imax + 1 - imin,
+            jmax + 1 - jmin,
+            kmax + 1 - kmin,
+            data.grid.x[imax] - data.grid.x[imin],
+            data.grid.y[jmax] - data.grid.y[jmin],
+            data.grid.z[kmax] - data.grid.z[kmin],
+            data.grid.x[imin:imax],
+            data.grid.y[jmin:jmax],
+            data.grid.z[kmin:kmax]
+        ), 
+        iteration = data.iteration,
+        time = data.time,
+        field = data.field[:,imin:imax,jmin:jmax,kmin:kmax],
+    )
+end
+
+
+function crop(
         data::PlaneData{T,I};
         xmin = data.grid.x[1], xmax = data.grid.x[end], 
         ymin = data.grid.y[1], ymax = data.grid.y[end],

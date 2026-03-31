@@ -17,6 +17,7 @@ using Test
     # VectorData
     data = load("flow.10.1", "flow.10.2", "flow.10.3", prec=Float64)
     data = convert(Float32, data)
+    data = crop(data)
     data - data + 2*data/7.0
     abs(data)
 
@@ -29,7 +30,7 @@ end
     data = load(file, prec=Float64, verbose=false)
     data = convert(Float32, data)
     # TODO
-    printstyled("✓ Statistics.jl tests passed \n", bold=true, color=:green)
+    printstyled("✓ Statistics.jl passed \n", bold=true, color=:green)
 end
 
 
@@ -56,10 +57,18 @@ end
     data2 = divergence(data)
     divergence!(data2, data)
 
-    printstyled("✓ Calculus.jl tests passed \n", bold=true, color=:green)
+    printstyled("✓ Calculus.jl passed \n", bold=true, color=:green)
 end
 
 
 @testset "Physics.jl" begin
     # TODO
+end
+
+
+@testset "Tools.jl" begin
+    grid = loadgrid("grid")
+    @time GridMapping.spacing(grid)
+    @time GridMapping.stretching(grid)
+    printstyled("✓ Tools.jl passed \n", bold=true, color=:green)
 end

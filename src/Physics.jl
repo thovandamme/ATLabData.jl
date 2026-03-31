@@ -2,8 +2,6 @@ module Physics
 
 using ..DataStructures, ..IO, ..Basics, ..Statistics, ..Calculus
 
-using ForwardDiff
-
 export vorticity, enstrophy, Ri, tke, TurbulenceScales
 
 
@@ -115,7 +113,7 @@ end
 function turbulent_diffusivity(
         flux::Vector{T}, mean::Vector{T}; axis::Vector{T}
     )::Vector{T} where {T<:AbstractFloat}
-    return - flux ./ ForwardDiff.derivative.(mean, axis)
+    return - flux ./ ∂x(mean, axis)
 end
 
 

@@ -5,6 +5,7 @@ using NonlinearSolve
 using NaturalSort
 using ..DataStructures
 using ..IO: init
+using ..Calculus
 
 export GridMapping
 export shiftgrid!, transform_grid, calculate_grid
@@ -14,7 +15,7 @@ export filefilter!
 
 
 module GridMapping
-    using ..Interpolations, ForwardDiff, ..DataStructures
+    using ..Interpolations, ..Calculus, ..DataStructures
 
     export mapping, dmapping, ddmapping, dddmapping
     export spacing, stretching, dstretching, dstretching
@@ -46,32 +47,19 @@ module GridMapping
     # NOTE Δz is also available by simple Δz=diff(z), giving the data point margins
     # But, then length(Δz) = length(z)-1
     @inline spacing(nodes, z) = begin
-        itp = extrapolate(
-            interpolate((nodes,), z, Gridded(Linear())), 
-            Line()
-        )
-        return ForwardDiff.derivative.(Ref(itp), nodes)
+        return diff(z)
     end
     @inline spacing(grid::Grid) = spacing(1:grid.nz, grid.z)
     @inline spacing(z::Vector{<:AbstractFloat}) = spacing(1:length(z), z)
 
     @inline stretching(z) = begin
         Δz = diff(z)
-        (Δz[2:end] .- Δz[1:end-1])./Δz[1:end-1].*100
-        # With the below variant one gets stretching in the same dimension as z
-        # itp = extrapolate(
-        #     interpolate((collect(1:lenth(z)),), spacing(z), Gridded(Linear())), 
-        #     Line()
-        # )
-        # return ForwardDiff.derivative.(Ref(itp), nodes) ./ spacing(z)
+        return (Δz[2:end] .- Δz[1:end-1])./Δz[1:end-1].*100
+        # return ∂x(Δz, z)
     end
     @inline stretching(grid::Grid) = stretching(grid.z)
     @inline dstretching(z) = begin
-        itp = extrapolate(
-            interpolate((collect(1:length(z)-2),), stretching(z), Gridded(Linear())), 
-            Line()
-        )
-        ForwardDiff.derivative.(Ref(itp), z)
+        return ∂x²(stretching(z), z)
     end
 end
 
