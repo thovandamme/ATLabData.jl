@@ -94,8 +94,8 @@ function fornberg_method_x!(
         stencil = stencils[i]
         for is ∈ eachindex(stencil)
             h = stencil[is]
-            for k ∈ 1:nz
-                @turbo for j ∈ 1:ny
+            @turbo for k ∈ 1:nz
+                for j ∈ 1:ny
                     @inbounds res_buffer[j,k,i] += w[is]*field_buffer[j,k,h]
                 end
             end
@@ -143,8 +143,8 @@ function fornberg_method_z!(
         stencil = stencils[k]
         for is ∈ eachindex(stencil)
             h = stencil[is]
-            for j ∈ 1:ny
-                @turbo for i ∈ 1:nx
+            @turbo for j ∈ 1:ny
+                for i ∈ 1:nx
                     @inbounds res[i,j,k] += w[is]*field[i,j,h]
                 end
             end

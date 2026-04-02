@@ -245,7 +245,7 @@ jacobian().
 # TODO proper implementation for 2D
 global function jacobian!(
         res::AbstractArray{T,5}, field::AbstractArray{T,4}, grid::Grid{T,I}; 
-        stencil_size::Signed=7, verbose=true
+        stencil_size::Signed=9, verbose=true
     ) where {T<:AbstractFloat, I<:Signed}
     twoD = false
     (size(field)[3]==1) && (twoD=true)
@@ -284,7 +284,7 @@ end
 Mutating variant of jacobian(data).
 """
 global function jacobian!(
-        res::AbstractArray{T,5}, data::VectorData{T,I}; stencil_size::Signed=7, verbose=true
+        res::AbstractArray{T,5}, data::VectorData{T,I}; stencil_size::Signed=9, verbose=true
     ) where {T<:AbstractFloat, I<:Signed}
     jacobian!(res, data.field, data.grid, stencil_size=stencil_size, verbose=verbose)
     return nothing
@@ -297,7 +297,7 @@ Calculate the Jacobian of the VectorData data. grid of type Grid contains
 the axis information.
 """
 global function jacobian(
-        data::VectorData{T,I}; stencil_size::Signed=7, verbose=true
+        data::VectorData{T,I}; stencil_size::Signed=9, verbose=true
     )::Array{T,5} where {T<:AbstractFloat, I<:Signed}
     return jacobian(data.field, data.grid, stencil_size=stencil_size, verbose=verbose)
 end
@@ -309,7 +309,7 @@ Calculate the Jacobian of the vector valued field. grid of type Grid contains
 the axis information.
 """
 global function jacobian(
-        field::AbstractArray{T,4}, grid::Grid{T,I}; stencil_size::Signed=7, verbose=true
+        field::AbstractArray{T,4}, grid::Grid{T,I}; stencil_size::Signed=9, verbose=true
     )::Array{T,5} where {T<:AbstractFloat, I<:Signed}
     res = Array{T}(undef, 3, 3, grid.nx, grid.ny, grid.nz)
     jacobian!(res, field, grid, stencil_size=stencil_size, verbose=verbose)
@@ -320,6 +320,7 @@ end
 ################################################################################
 #                               Curl
 ################################################################################
+# TODO Implement with FDM module
 """
     curl(data)
 Calculates ∇×(data) and returns VectorData.
