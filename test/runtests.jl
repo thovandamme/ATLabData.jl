@@ -54,8 +54,12 @@ end
     data = convert(Float32, data)
     @time data2 = curl(data)
     @time curl!(data2, data)
-    data2 = divergence(data)
-    divergence!(data2, data)
+    @time data2 = divergence(data)
+    @time divergence!(data2, data)
+    @time data2 = jacobian(data)
+    @time jacobian(data.field, data.grid)
+    @time jacobian!(data2, data.field, data.grid)
+    @time jacobian!(data2, data)
 
     printstyled("✓ Calculus.jl passed \n", bold=true, color=:green)
 end
@@ -70,5 +74,6 @@ end
     grid = loadgrid("grid")
     @time GridMapping.spacing(grid)
     @time GridMapping.stretching(grid)
+    # TODO
     printstyled("✓ Tools.jl passed \n", bold=true, color=:green)
 end

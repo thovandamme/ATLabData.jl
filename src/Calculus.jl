@@ -17,7 +17,8 @@ using Polyester
 
 export ∂x, ∂y, ∂z, ∂x!, ∂y!, ∂z!
 export ∂x², ∂y², ∂z², ∂x2, ∂y2, ∂z2
-export gradient, gradient!, curl, curl!, divergence, divergence!
+export gradient, gradient!, jacobian, jacobian!
+export curl, curl!, divergence, divergence!
 
 
 let
@@ -230,6 +231,89 @@ function gradient2D!(
     fornberg_method_x!(view(res, 1, :, :, :), data.field, weights_x, x_stencils)
     fornberg_method_z!(view(res, 2, :, :, :), data.field, weights_z, z_stencils)
     return nothing
+end
+
+
+################################################################################
+#                   Jacobian (gradient of vector field)
+################################################################################
+"""
+    jacobian!(res, field, grid)
+Mutating variant of jacobian(). Serves as kernel for all other methods of 
+jacobian().
+"""
+# TODO proper implementation for 2D
+global function jacobian!(
+        res::AbstractArray{T,5}, field::AbstractArray{T,4}, grid::Grid{T,I}; 
+        stencil_size::Signed=7, verbose=true
+    ) where {T<:AbstractFloat, I<:Signed}
+    twoD = false
+    (size(field)[3]==1) && (twoD=true)
+    verbose && do_verbose("jacobian")
+    weights_x = get_weights(grid.x, stencil_size)
+    (! twoD) && (weights_y = get_weights(grid.y, stencil_size))
+    weights_z = get_weights(grid.z, stencil_size)
+    x_stencils = get_stencils(grid.nx, stencil_size)
+    y_stencils = get_stencils(grid.ny, stencil_size)
+    z_stencils = get_stencils(grid.nz, stencil_size)
+    # Loop over the vector field components
+    for h ∈ 1:3
+        fornberg_method_x!(
+            view(res, 1, h, :, :, :), view(field, h, :, :, :),
+            weights_x, x_stencils
+        )
+        if twoD
+            view(res, 2, h, :, :, :) .= 0.0
+        else
+            fornberg_method_y!(
+                view(res, 2, h, :, :, :), view(field, h, :, :, :),
+                weights_y, y_stencils
+            )
+        end
+        fornberg_method_z!(
+            view(res, 3, h, :, :, :), view(field, h, :, :, :),
+            weights_z, z_stencils
+        )
+    end
+    return nothing
+end
+
+
+"""
+    jacobian!(res, data)
+Mutating variant of jacobian(data).
+"""
+global function jacobian!(
+        res::AbstractArray{T,5}, data::VectorData{T,I}; stencil_size::Signed=7, verbose=true
+    ) where {T<:AbstractFloat, I<:Signed}
+    jacobian!(res, data.field, data.grid, stencil_size=stencil_size, verbose=verbose)
+    return nothing
+end
+
+
+"""
+    jacobia(data)
+Calculate the Jacobian of the VectorData data. grid of type Grid contains 
+the axis information.
+"""
+global function jacobian(
+        data::VectorData{T,I}; stencil_size::Signed=7, verbose=true
+    )::Array{T,5} where {T<:AbstractFloat, I<:Signed}
+    return jacobian(data.field, data.grid, stencil_size=stencil_size, verbose=verbose)
+end
+
+
+"""
+    jacobia(field, grid)
+Calculate the Jacobian of the vector valued field. grid of type Grid contains 
+the axis information.
+"""
+global function jacobian(
+        field::AbstractArray{T,4}, grid::Grid{T,I}; stencil_size::Signed=7, verbose=true
+    )::Array{T,5} where {T<:AbstractFloat, I<:Signed}
+    res = Array{T}(undef, 3, 3, grid.nx, grid.ny, grid.nz)
+    jacobian!(res, field, grid, stencil_size=stencil_size, verbose=verbose)
+    return res
 end
 
 
