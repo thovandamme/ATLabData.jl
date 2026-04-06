@@ -148,7 +148,8 @@ end
     flucs(data)
 Computes the fluctuation part of _data_ by subtracting the mean.
 """
-flucs(data::AbstractData)::AbstractData = data - mean(data)
+# TODO produces wrong results in averages.jl
+# flucs(data::AbstractData)::AbstractData = data - mean(data)
 
 function flucs!(data::ScalarData)
     for k ∈ 1:data.grid.nz

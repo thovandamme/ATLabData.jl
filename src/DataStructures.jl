@@ -85,6 +85,7 @@ end
 # end
 
 
+# TODO Revise
 mutable struct AveragesData{T,I} <: AbstractData{T,I}
     name::String
     time::Vector{T}

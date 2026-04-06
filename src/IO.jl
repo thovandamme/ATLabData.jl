@@ -67,7 +67,7 @@ global load!(
 ) where {T<:AbstractFloat, I<:Signed} = _ScalarData_from_file!(data, file, verbose)
 global load!(
     data::VectorData{T,I}, xfile::String, yfile::String, zfile::String
-) where {T<:AbstractFloat, I<:Signed} = _VectorData_from_file!(data, xfile, yfile, zfile)
+) where {T<:AbstractFloat, I<:Signed} = _VectorData_from_file!(data, xfile, yfile, zfile) # TODO
 global load!(
     data::PlaneData{T,I}, file::String, plane::Int, var::Symbol; 
     vars::Dict=Dict(:u=>1, :v=>2, :w=>3, :b=>4, :p=>5)
@@ -385,6 +385,7 @@ end
 # ------------------------------------------------------------------------------
 #                            AveragesData
 # ------------------------------------------------------------------------------
+# TODO Use NCDatasets.jl
 function _AveragesData_from_NetCDF(file::String, var::String)::AveragesData
     return AveragesData(
         name = var,

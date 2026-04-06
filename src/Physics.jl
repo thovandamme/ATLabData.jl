@@ -3,13 +3,13 @@ module Physics
 using Polyester, LoopVectorization
 using ..DataStructures, ..IO, ..Basics, ..Statistics, ..Calculus
 
-export vorticity, enstrophy, Ri
-
 export kinenergy, kinenergy!
 export Reynolds_stress_tensor, Reynolds_stress_tensor!
 export dissipation_rate, dissipation_rate!
 export dissipation_tensor, dissipation_tensor!
-export production_rate!
+export production_rate!, production_rate
+export vorticity!, vorticity
+export buoyancy_flux!
 
 
 function do_verbose(field::String)
@@ -129,7 +129,7 @@ end
 #                       Kinetic energy statistic
 ################################################################################
 function kinenergy!(
-        res::Array{T,1}, u::AbstractArray{T,4}
+        res::AbstractArray{T,1}, u::AbstractArray{T,4}
     ) where {T<:AbstractFloat}
     nv, nx, ny, nz = size(u)
     @inbounds @batch for k ∈ 1:nz
@@ -146,9 +146,19 @@ end
 
 
 function kinenergy!(
-        res::Array{T,1}, u::VectorData{T,I}
+        res::AbstractArray{T,1}, u::VectorData{T,I}
     ) where {T<:AbstractFloat, I<:Signed}
     kinenergy!(res, u.field)
+    return nothing
+end
+
+
+function kinenergy!(
+        res::AbstractArray{T,1}, R::AbstractArray{T,3}
+    ) where {T<:AbstractFloat}
+    @turbo for k ∈ eachindex(res)
+        res[k] = 0.5*(R[1,1,k] + R[2,2,k] + R[3,3,k])
+    end
     return nothing
 end
 
@@ -163,8 +173,9 @@ end
 ################################################################################
 #                       Reynolds stress tensor
 ################################################################################
+# TODO OPtimize: Rᵢⱼ is symmetric
 function Reynolds_stress_tensor!(
-        res::Array{T,3}, field::Array{T,4}; verbose=true
+        res::Array{T,3}, field::AbstractArray{T,4}; verbose=true
     ) where {T<:AbstractFloat}
     verbose && do_verbose("Rᵢⱼ")
     nv, nx, ny, nz = size(field)
@@ -173,10 +184,8 @@ function Reynolds_stress_tensor!(
         for h ∈ 1:nv
             for g ∈ 1:nv
                 acc = zero(T)
-                for j ∈ 1:ny
-                    @turbo for i ∈ 1:nx
-                        @inbounds acc += field[g,i,j,k]*field[h,i,j,k]
-                    end
+                @turbo for j ∈ 1:ny, i ∈ 1:nx
+                    @inbounds acc += field[g,i,j,k]*field[h,i,j,k]
                 end
                 res[g,h,k] = acc/(nx*ny)
             end
@@ -187,7 +196,7 @@ end
 
 
 function Reynolds_stress_tensor(
-        field::Array{T,4}
+        field::AbstractArray{T,4}
     )::Array{T,3} where {T<:AbstractFloat}
     res = Array{T, 3}(undef, 3, 3, size(field)[4])
     Reynolds_stress_tensor!(res, field)
@@ -367,7 +376,7 @@ function production_rate!(
                         @inbounds acc += 0.5*(pointer1[i,j] + pointer2[i,j])
                     end
                 end
-                S[g,h,k] = acc/(fulldata.grid.nx*fulldata.grid.ny)
+                S[g,h,k] = acc/(nx*ny)
             end
         end
     end
@@ -394,6 +403,51 @@ end
 
 
 # TODO Allocating variants
+
+
+################################################################################
+#                           Vorticity
+################################################################################
+
+function vorticity!(
+        res::Array{T,4}, ∇u::AbstractArray{T,5}
+    ) where {T<:AbstractFloat}
+    nx, ny, nz = size(res)[2:end]
+    @tturbo for k ∈ 1:nz, j ∈ 1:ny, i ∈ 1:nx
+        res[1,i,j,k] = ∇u[2,3,i,j,k] - ∇u[3,2,i,j,k]
+        res[2,i,j,k] = ∇u[3,1,i,j,k] - ∇u[1,3,i,j,k]
+        res[3,i,j,k] = ∇u[1,2,i,j,k] - ∇u[2,1,i,j,k]
+    end
+    return nothing
+end
+
+
+function vorticity(∇u::AbstractArray{T,5})::Array{T,4} where {T<:AbstractFloat}
+    nx, ny, nz = size(∇u)[2:end]
+    res = Array{T,4}(undef, 3, nx, ny, nz)
+    vorticity!(res, ∇u)
+    return res
+end
+
+
+################################################################################
+#                 Buoyancy production rate / Buoyancy flux
+################################################################################
+
+function buoyancy_flux!(
+        res::AbstractArray{T,1}, b::AbstractArray{T,3}, w::AbstractArray{T,3}
+    ) where {T<:AbstractFloat}
+    nx, ny, nz = size(b)
+    @inbounds @batch for k ∈ 1:nz
+        acc = zero(T)
+        @turbo for j ∈ 1:ny, i ∈ 1:nx
+            acc += b[i,j,k]*w[i,j,k]
+        end
+        res[k] = acc/(nx*ny)
+    end
+    return nothing
+end
+
 
 
 end
