@@ -252,6 +252,7 @@ global function jacobian!(
     verbose && do_verbose("jacobian")
     weights_x = get_weights(grid.x, stencil_size)
     (! twoD) && (weights_y = get_weights(grid.y, stencil_size))
+    # weights_y = get_weights(grid.y, stencil_size)
     weights_z = get_weights(grid.z, stencil_size)
     x_stencils = get_stencils(grid.nx, stencil_size)
     y_stencils = get_stencils(grid.ny, stencil_size)
@@ -277,6 +278,26 @@ global function jacobian!(
     end
     return nothing
 end
+
+# This functions trys to reduce the multithread overhead
+# global function jacobian3D!(
+#         res::AbstractArray{T,5}, field::AbstractArray{T,4}, grid::Grid{T,I}; 
+#         stencil_size::Signed=9, verbose=true
+#     ) where {T<:AbstractFloat, I<:Signed}
+#     verbose && do_verbose("jacobian")
+#     weights_x = get_weights(grid.x, stencil_size)
+#     weights_y = get_weights(grid.y, stencil_size)
+#     weights_z = get_weights(grid.z, stencil_size)
+#     x_stencils = get_stencils(grid.nx, stencil_size)
+#     y_stencils = get_stencils(grid.ny, stencil_size)
+#     z_stencils = get_stencils(grid.nz, stencil_size)
+    
+#     # Merged loop for derivatives in x and z
+#     @inbounds @batch for k ∈ 1:nz
+        
+#     end
+#     return nothing
+# end
 
 
 """

@@ -14,9 +14,10 @@ let
     """
     global function get_weights(
             axis::Vector{T}, stencil_size::Signed; order=1
-        )::Vector{Vector{<:AbstractFloat}} where {T<:AbstractFloat}
+        )::Matrix{T} where {T<:AbstractFloat}
         nx = length(axis)
-        res = Vector{Vector{<:AbstractFloat}}(undef, nx)
+        # res = Vector{Vector{<:AbstractFloat}}(undef, nx)
+        res = Matrix{T}(undef, stencil_size, nx)
         half = stencil_size÷2
         @inbounds for i ∈ eachindex(axis)
             imin = max(1, i-half) # minimum index is 1
@@ -28,7 +29,7 @@ let
                     imin, imax = nx-stencil_size+1, nx
                 end
             end
-            res[i] = fdweights(axis[imin:imax] .- axis[i], order)
+            res[:,i] .= fdweights(axis[imin:imax] .- axis[i], order)[:]
         end
         return res
     end
@@ -77,26 +78,22 @@ let
 end
 
 
-# TODO Optimize - is there a variant which can @turbo the inner loop without 
-# the additional buffers?
-function fornberg_method_x!(
+function _fornberg_method_x!(
         res::AbstractArray{T,3},
-        field::AbstractArray{T,3}, 
-        weights::Vector{Vector{<:AbstractFloat}},
-        stencils::Vector{UnitRange}
+        field::AbstractArray{T,3},
+        weights::Matrix{T},
+        stencils::Matrix{<:Signed}
     ) where {T<:AbstractFloat}
     nx, ny, nz = size(field)
-    fill!(res, zero(T))
     res_buffer = permutedims(res, [2,3,1])
     field_buffer = permutedims(field, [2,3,1])
     @inbounds @batch for i ∈ 1:nx
-        w = weights[i]
-        stencil = stencils[i]
+        w = view(weights,:, i)
+        stencil = view(stencils, :, i)
         for is ∈ eachindex(stencil)
-            h = stencil[is]
             @turbo for k ∈ 1:nz
                 for j ∈ 1:ny
-                    @inbounds res_buffer[j,k,i] += w[is]*field_buffer[j,k,h]
+                    @inbounds res_buffer[j,k,i] += w[is]*field_buffer[j,k,stencil[is]]
                 end
             end
         end
@@ -106,22 +103,74 @@ function fornberg_method_x!(
 end
 
 
+# Optimized version of above
+function fornberg_method_x!(
+        res::AbstractArray{T,3},
+        field::AbstractArray{T,3},
+        weights::Matrix{T},
+        stencils::Matrix{<:Signed}
+    ) where {T<:AbstractFloat}
+    nx, ny, nz = size(field)
+    @inbounds @batch for k ∈ 1:nz
+        for j ∈ 1:ny
+            for i ∈ 1:nx
+                w = view(weights, :, i)
+                stencil = view(stencils, :, i)
+                acc = zero(T)
+                # NOTE: @turbo makes this loop ≈3x slower
+                for is ∈ eachindex(stencil)
+                    acc += w[is]*field[stencil[is],j,k]
+                end
+                res[i,j,k] = acc
+            end
+        end
+    end
+    return nothing
+end
+
+
+# Do not use this one - about 3x slower than the next version
+function _fornberg_method_y!(
+        res::AbstractArray{T,3},
+        field::AbstractArray{T,3}, 
+        weights::Matrix{T},
+        stencils::Matrix{<:Signed}
+    ) where {T<:AbstractFloat}
+    nx, ny, nz = size(field)
+    @inbounds @batch for k ∈ 1:nz
+        for j ∈ 1:ny
+            w = view(weights, :, j)
+            stencil = view(stencils, :, j)
+            for i ∈ 1:nx
+                acc = zero(T)
+                for is ∈ eachindex(stencil)        
+                    acc += w[is]*field[i,stencil[is],k]
+                end
+                res[i,j,k] = acc
+            end
+        end
+    end
+    return nothing
+end
+
+
+# Benchmarks better than version above with accumulator (3x faster)
 function fornberg_method_y!(
         res::AbstractArray{T,3},
         field::AbstractArray{T,3}, 
-        weights::Vector{Vector{<:AbstractFloat}},
-        stencils::Vector{UnitRange}
+        weights::Matrix{T},
+        stencils::Matrix{<:Signed}
     ) where {T<:AbstractFloat}
-    nx, ny, nz = size(field)
     fill!(res, zero(T))
+    nx, ny, nz = size(field)
     @inbounds @batch for k ∈ 1:nz
         for j ∈ 1:ny
-            w = weights[j]
-            stencil = stencils[j]
+            ws = view(weights, :, j)
+            stencil = view(stencils, :, j)
             for is ∈ eachindex(stencil)
-                h = stencil[is]
+                w = ws[is]; h = stencil[is]
                 @turbo for i ∈ 1:nx
-                    @inbounds res[i,j,k] += w[is]*field[i,h,k]
+                    res[i,j,k] += w*field[i,h,k]
                 end
             end
         end
@@ -132,20 +181,21 @@ end
 
 function fornberg_method_z!(
         res::AbstractArray{T,3},
-        field::AbstractArray{T,3}, 
-        weights::Vector{Vector{<:AbstractFloat}},
-        stencils::Vector{UnitRange}
+        field::AbstractArray{T,3},
+        weights::Matrix{T},
+        stencils::Matrix{<:Signed}
     ) where {T<:AbstractFloat}
-    nx, ny, nz = size(field)
     fill!(res, zero(T))
+    nx, ny, nz = size(field)
     @inbounds @batch for k ∈ 1:nz
-        w = weights[k]
-        stencil = stencils[k]
+        ws = view(weights, :, k)
+        stencil = view(stencils, :, k)
         for is ∈ eachindex(stencil)
-            h = stencil[is]
-            @turbo for j ∈ 1:ny
-                for i ∈ 1:nx
-                    @inbounds res[i,j,k] += w[is]*field[i,j,h]
+            w = ws[is]; h = stencil[is]
+            for j ∈ 1:ny
+                # NOTE: Better benchmark with @turbo at the innermost loop
+                @turbo for i ∈ 1:nx
+                    res[i,j,k] += w*field[i,j,h]
                 end
             end
         end
@@ -157,16 +207,14 @@ end
 function fornberg_method_1D!(
         res::AbstractArray{T,1},
         field::AbstractArray{T,1},
-        weights::Vector{Vector{<:AbstractFloat}},
-        stencils::Vector{UnitRange}
+        weights::Matrix{T},
+        stencils::Matrix{<:Signed}
     ) where {T<:AbstractFloat}
-    fill!(res, zero(T))
     @inbounds for i ∈ eachindex(field)
-        w = weights[i]
-        stencil = stencils[i]
+        w = view(weights,: ,i)
+        stencil = view(stencils, :, i)
         for is ∈ eachindex(stencil)
-            h = stencil[is]
-            res[i] += w[is]*field[h]
+            res[i] += w[is]*field[stencil[is]]
         end
     end
     return nothing
@@ -175,10 +223,12 @@ end
 
 function get_stencils(
         n::Signed, stencil_size::Signed
-    )::Vector{UnitRange}
+    # )::Vector{UnitRange}
+    )::Matrix{<:Signed}
     half = stencil_size ÷ 2
-    stencils = Vector{UnitRange}(undef, n)
-    for i ∈ eachindex(stencils)
+    # stencils = Vector{UnitRange}(undef, n)
+    stencils = Matrix{Int}(undef, stencil_size, n)
+    for i ∈ 1:n
         imin = max(1, i-half) # minimum index is 1
         imax = min(n, i+half) # maximum index is nx
         if imax - imin + 1 < stencil_size
@@ -188,7 +238,12 @@ function get_stencils(
                 imin, imax = n-stencil_size+1, n
             end
         end
-        stencils[i] = imin:imax
+        # stencils[i] = imin:imax
+        j = 1
+        for is ∈ imin:imax
+            stencils[j,i] = is
+            j += 1
+        end
     end
     return stencils
 end
