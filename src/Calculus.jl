@@ -33,7 +33,7 @@ end
 
 # Derivatives of 1D data
 global function ∂x(
-        data::Vector{T}, axis::Vector{T}; stencil_size=7, verbose=true
+        data::Vector{T}, axis::Vector{T}; stencil_size=9, verbose=true
     )::Vector{T} where {T<:AbstractFloat}
     verbose && do_verbose("1D derivative")
     res = similar(data)
@@ -45,7 +45,7 @@ end
 
 
 global function ∂x²(
-        data::Vector{T}, axis::Vector{T}; stencil_size=7, verbose=true
+        data::Vector{T}, axis::Vector{T}; stencil_size=9, verbose=true
     )::Vector{T} where {T<:AbstractFloat}
     verbose && do_verbose("2nd-order 1D derivative")
     res = similar(data)
@@ -58,26 +58,51 @@ global ∂x2(args...; kwargs...) = ∂x²(args...; kwargs...)
 
 
 global ∂y(
-    data::Vector{T}, axis::Vector{T}; stencil_size=7, verbose=true
+    data::Vector{T}, axis::Vector{T}; stencil_size=9, verbose=true
 ) where {T<:AbstractFloat} = ∂x(data, axis, stencil_size=stencil_size, verbose=verbose)
 global ∂y²(
-    data::Vector{T}, axis::Vector{T}; stencil_size=7, verbose=true
+    data::Vector{T}, axis::Vector{T}; stencil_size=9, verbose=true
 ) where {T<:AbstractFloat} = ∂x²(data, axis, stencil_size=stencil_size, verbose=verbose)
 global ∂y2(args...; kwargs...) = ∂y²(args...; kwargs...)
 
 
 global ∂z(
-    data::Vector{T}, axis::Vector{T}; stencil_size=7, verbose=true
+    data::Vector{T}, axis::Vector{T}; stencil_size=9, verbose=true
 ) where {T<:AbstractFloat} = ∂x(data, axis, stencil_size=stencil_size, verbose=verbose)
 global ∂z²(
-    data::Vector{T}, axis::Vector{T}; stencil_size=7, verbose=true
+    data::Vector{T}, axis::Vector{T}; stencil_size=9, verbose=true
 ) where {T<:AbstractFloat} = ∂x²(data, axis, stencil_size=stencil_size, verbose=verbose)
 global ∂z2(args...; kwargs...) = ∂z²(args...; kwargs...)
 
 
+# Derivatives of 2D data
+global function ∂x(
+        data::Matrix{T}, axis::Vector{T}; stencil_size=9, verbose=true
+    )::Matrix{T} where {T<:AbstractFloat}
+    verbose && do_verbose("2D derivative")
+    res = similar(data)
+    weights = get_weights(axis, stencil_size)
+    stencils = get_stencils(length(axis), stencil_size)
+    fornberg_method_2D_x!(res, data, weights, stencils)
+    return res
+end
+
+
+global function ∂y(
+        data::Matrix{T}, axis::Vector{T}; stencil_size=9, verbose=true
+    )::Matrix{T} where {T<:AbstractFloat}
+    verbose && do_verbose("2D derivative")
+    res = similar(data)
+    weights = get_weights(axis, stencil_size)
+    stencils = get_stencils(length(axis), stencil_size)
+    fornberg_method_2D_y!(res, data, weights, stencils)
+    return res
+end
+
+
 # Derivatives of ScalarData
 global function ∂x(
-        data::ScalarData{T,I}; stencil_size=7, verbose=true
+        data::ScalarData{T,I}; stencil_size=9, verbose=true
     )::ScalarData{T,I} where {T<:AbstractFloat, I<:Signed}
     verbose && do_verbose("derivative in x")
     res = similar(data.field)
@@ -95,7 +120,7 @@ end
 
 
 global function ∂x!(
-        res::ScalarData{T,I}, data::ScalarData{T,I}; stencil_size=7, verbose=true
+        res::ScalarData{T,I}, data::ScalarData{T,I}; stencil_size=9, verbose=true
     )::ScalarData{T,I} where {T<:AbstractFloat, I<:Signed}
     verbose && do_verbose("derivative in x")
     weights = get_weights(data.grid.x, stencil_size)
@@ -106,7 +131,7 @@ end
 
 
 global function ∂y(
-        data::ScalarData{T,I}; stencil_size=7, verbose=true
+        data::ScalarData{T,I}; stencil_size=9, verbose=true
     )::ScalarData{T,I} where {T<:AbstractFloat, I<:Signed}
     verbose && do_verbose("derivative in y")
     res = similar(data.field)
@@ -124,7 +149,7 @@ end
 
 
 global function ∂y!(
-        res::ScalarData{T,I}, data::ScalarData{T,I}; stencil_size=7, verbose=true
+        res::ScalarData{T,I}, data::ScalarData{T,I}; stencil_size=9, verbose=true
     )::ScalarData{T,I} where {T<:AbstractFloat, I<:Signed}
     verbose && do_verbose("derivative in y")
     weights = get_weights(data.grid.y, stencil_size)
@@ -135,7 +160,7 @@ end
 
 
 global function ∂z(
-        data::ScalarData{T,I}; stencil_size=7, verbose=true
+        data::ScalarData{T,I}; stencil_size=9, verbose=true
     )::ScalarData{T,I} where {T<:AbstractFloat, I<:Signed}
     verbose && do_verbose("derivative in z")
     res = similar(data.field)
@@ -153,7 +178,7 @@ end
 
 
 global function ∂z!(
-        res::ScalarData{T,I}, data::ScalarData{T,I}; stencil_size=7, verbose=true
+        res::ScalarData{T,I}, data::ScalarData{T,I}; stencil_size=9, verbose=true
     )::ScalarData{T,I} where {T<:AbstractFloat, I<:Signed}
     verbose && do_verbose("derivative in z")
     weights = get_weights(data.grid.z, stencil_size)
@@ -347,7 +372,7 @@ end
 Calculates ∇×(data) and returns VectorData.
 """
 global function curl(
-        data::VectorData{T,I}; stencil_size=7, verbose=true
+        data::VectorData{T,I}; stencil_size=9, verbose=true
     )::VectorData{T,I} where {T<:AbstractFloat, I<:Signed}
     verbose && do_verbose("curl")
     res = Array{T}(undef, 3, data.grid.nx, data.grid.ny, data.grid.nz)
@@ -370,7 +395,7 @@ end
 Mutating variant fo curl(data).
 """
 global function curl!(
-        res::VectorData{T,I}, data::VectorData{T,I}; stencil_size=7, verbose=true
+        res::VectorData{T,I}, data::VectorData{T,I}; stencil_size=9, verbose=true
     ) where {T<:AbstractFloat, I<:Signed}
     verbose && do_verbose("curl")
     if data.grid.ny > 1
@@ -432,7 +457,7 @@ end
 #                           Divergence
 ################################################################################
 global function divergence(
-        data::VectorData{T,I}; stencil_size=7, verbose=true
+        data::VectorData{T,I}; stencil_size=9, verbose=true
     )::ScalarData{T,I} where {T<:AbstractFloat, I<:Signed}
     verbose && do_verbose("divergence")
     res = Array{T}(undef, data.grid.nx, data.grid.ny, data.grid.nz)
@@ -452,7 +477,7 @@ end
 
 
 global function divergence!(
-        res::ScalarData{T,I}, data::VectorData{T,I}; stencil_size=7, verbose=true
+        res::ScalarData{T,I}, data::VectorData{T,I}; stencil_size=9, verbose=true
     ) where {T<:AbstractFloat, I<:Signed}
     verbose && do_verbose("divergence")
     if data.grid.ny > 1

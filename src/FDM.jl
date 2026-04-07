@@ -4,7 +4,9 @@ using Polyester
 using LoopVectorization
 
 export get_weights, get_stencils
-export fornberg_method_1D!, fornberg_method_x!, fornberg_method_y!, fornberg_method_z!
+export fornberg_method_1D!
+export fornberg_method_2D_x!, fornberg_method_2D_y!
+export fornberg_method_x!, fornberg_method_y!, fornberg_method_z!
 
 
 let
@@ -215,6 +217,51 @@ function fornberg_method_1D!(
         stencil = view(stencils, :, i)
         for is ∈ eachindex(stencil)
             res[i] += w[is]*field[stencil[is]]
+        end
+    end
+    return nothing
+end
+
+
+function fornberg_method_2D_x!(
+        res::AbstractArray{T,2},
+        field::AbstractArray{T,2},
+        weights::Matrix{T},
+        stencils::Matrix{<:Signed}
+    ) where {T<:AbstractFloat}
+    nx, ny = size(field)
+    @inbounds @batch for j ∈ 1:ny
+        for i ∈ 1:nx
+            w = view(weights, :, i)
+            stencil = view(stencils, :, i)
+            acc = zero(T)
+            # NOTE: @turbo makes this loop ≈3x slower
+            for is ∈ eachindex(stencil)
+                acc += w[is]*field[stencil[is],j]
+            end
+            res[i,j] = acc
+        end
+    end
+    return nothing
+end
+
+
+function fornberg_method_2D_y!(
+        res::AbstractArray{T,2},
+        field::AbstractArray{T,2}, 
+        weights::Matrix{T},
+        stencils::Matrix{<:Signed}
+    ) where {T<:AbstractFloat}
+    fill!(res, zero(T))
+    nx, ny = size(field)
+    @inbounds @batch for j ∈ 1:ny
+        ws = view(weights, :, j)
+        stencil = view(stencils, :, j)
+        for is ∈ eachindex(stencil)
+            w = ws[is]; h = stencil[is]
+            @turbo for i ∈ 1:nx
+                res[i,j] += w*field[i,h]
+            end
         end
     end
     return nothing
