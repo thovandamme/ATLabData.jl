@@ -169,9 +169,6 @@ end
 
 function flucs!(data::VectorData)
     for k ∈ 1:data.grid.nz
-        # data.field[1,:,:,k] .-= sum(view(data.field, 1, :, :, k))./(data.grid.nx*data.grid.ny)
-        # data.field[2,:,:,k] .-= sum(view(data.field, 2, :, :, k))./(data.grid.nx*data.grid.ny)
-        # data.field[3,:,:,k] .-= sum(view(data.field, 3, :, :, k))./(data.grid.nx*data.grid.ny)
         for h ∈ eachindex(data.field[:,1,1,1])
             data.field[h,:,:,k] .-= sum(view(data.field, h, :, :, k))./(data.grid.nx*data.grid.ny)
         end

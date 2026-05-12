@@ -5,7 +5,7 @@ using ..DataStructures
 
 export load, load!, loadgrid, init, header
 
-let 
+
 # ------------------------------------------------------------------------------
 #                                   API
 # ------------------------------------------------------------------------------
@@ -14,7 +14,7 @@ let
     loadgrid(gridfile) -> Grid
 Loads the grid data from the file _gridfile_ into the composite type _grid_.
 """
-global loadgrid(gridfile::String)::Grid = _Grid_from_gridfile(gridfile)
+loadgrid(gridfile::String)::Grid = _Grid_from_gridfile(gridfile)
 
 
 """
@@ -39,36 +39,38 @@ axis index and var the varible which are supposed to be loaded, where var
 needs to the keys in the Dict _vars_. If _vars_ is not given, then it defaults 
 to (:u, :v, :w, :b).
 """
-global load(
+load(
     file::String; prec::Type=Float32, verbose::Bool=true
 )::ScalarData = _ScalarData_from_file(file, prec, verbose)
-global load(
+load(
     dir::String, field::String, time::Real; component::String=".0", verbose::Bool=true
 )::ScalarData = load(_file_for_time(dir, time, field, component), verbose)
-global load(
+load(
     xfile::String, yfile::String, zfile::String; prec::Type=Float32, verbose::Bool=true
 )::VectorData = _VectorData_from_files(xfile, yfile, zfile, prec, verbose)
-global load(
+load(
     file::String, var::String
 )::AveragesData = _AveragesData_from_NetCDF(file, var)
-global load(
+load(
     file::String, plane::Int, var::Symbol; prec::Type=Float32, 
     vars::Dict=Dict(:u=>1, :v=>2, :w=>3, :b=>4, :p=>5), verbose::Bool=true
 ) = _PlaneData_from_raw(file, plane, var, prec, vars, verbose)
-
+# load(
+#     file::String; zmin::Real, zmax::Real, verbose::Bool=true, prec::Type=Float32
+# )::ScalarData = _ScalarData_from_file(file)
 
 """
     load!(data, file)
 Version of _load_ for preallocated data container. This function does not 
     update the grid attribute!
 """
-global load!(
+load!(
     data::ScalarData{T,I}, file::String; verbose=true
 ) where {T<:AbstractFloat, I<:Signed} = _ScalarData_from_file!(data, file, verbose)
-global load!(
+load!(
     data::VectorData{T,I}, xfile::String, yfile::String, zfile::String
 ) where {T<:AbstractFloat, I<:Signed} = _VectorData_from_file!(data, xfile, yfile, zfile) # TODO
-global load!(
+load!(
     data::PlaneData{T,I}, file::String, plane::Int, var::Symbol; 
     vars::Dict=Dict(:u=>1, :v=>2, :w=>3, :b=>4, :p=>5)
 ) where {T<:AbstractFloat, I<:Signed} = _PlaneData_from_raw!(data, file, plane, var, vars)
@@ -80,7 +82,7 @@ Initialize an empty data container. dims has to be an integer in of value
 1 or 3. 1 correpsonds to _ScalarData_ while 3 returns _VectorData_. 
 Default for _dims_ is 1. _grid_ has to be of type _Grid_.
 """
-global function init(
+function init(
         grid::Grid{T,I};
         dims::Int=1
     )::AbstractData where {T<:AbstractFloat, I<:Signed}
@@ -104,7 +106,7 @@ global function init(
 end
 
 
-global function init(gridfile::String; dims::Int=1, T::Type=Float64)::AbstractData
+function init(gridfile::String; dims::Int=1, T::Type=Float64)::AbstractData
     return init(convert(T, loadgrid(gridfile)), dims=dims)
 end
 
@@ -371,6 +373,27 @@ function _Array_from_rawfile(
 end
 
 
+function _Array_from_rawfile(
+        grid::Grid{T,I}, fieldfile::String,
+        zmin::Real, zmax::Real
+    )::Array{T, 3} where {T<:AbstractFloat, I<:Signed}
+    io = open(fieldfile, "r")
+    h = _fieldheader(io)
+    kmin = argmin(abs.(grid.z .- zmin))
+    println(grid.z[kmin])
+    kmax = argmin(abs.(grid.z .- zmax))
+    println(grid.z[kmax])
+    nz = kmax- kmin
+    buffer = Vector{T}(undef, Int(grid.nx)*Int(grid.ny)*Int(nz))
+    startbyte = h.headersize + Int(kmin)*Int(grid.nx)*Int(grid.ny)
+    # endbyte = h.headersize + Int(kmax)*Int(nx)*Int(ny)
+    seek(io, startbyte)
+    read!(io, buffer)
+    close(io)
+    return reshape(buffer, (grid.nx, grid.ny, nz))
+end
+
+
 function _Array_from_rawfile_(
         io::IOStream, h::FieldHeader{T,I}
     )::Array{T, 3} where {T<:AbstractFloat, I<:Signed}
@@ -528,7 +551,7 @@ end
     header(file)
 Returns the header of _file_.
 """
-global function header(file::String)
+function header(file::String)
     filename = basename(file)
     io = open(file, "r")
     if startswith(filename, "scal.") || startswith(filename, "flow.")
@@ -663,9 +686,6 @@ end
 function done()
     printstyled("   Done \n", color=:green)
 end
-
-
-end # end of let encapsulation
 
 
 end
