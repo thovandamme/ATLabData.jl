@@ -212,6 +212,7 @@ function fornberg_method_1D!(
         weights::Matrix{T},
         stencils::Matrix{<:Signed}
     ) where {T<:AbstractFloat}
+    fill!(res, zero(T))
     @inbounds for i ∈ eachindex(field)
         w = view(weights,: ,i)
         stencil = view(stencils, :, i)
