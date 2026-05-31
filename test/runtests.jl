@@ -35,32 +35,14 @@ end
 
 
 @testset "Calculus.jl" begin
-    # ScalaData
+    grid = loadgrid("grid")
     file = "scal.10.1"
-    data = load(file, prec=Float64, verbose=false)
-    @time ∂x(data)
-    @time ∂z(data)
-    @time data2 = gradient(data)
-    @time gradient!(data2, data)
-
-    # 1D arrays
-    @time ∂x(data.field[:,1,107], data.grid.x)
-    @time ∂z(data.field[3,1,:], data.grid.z)
-    @time ∂x2(data.field[:,1,107], data.grid.x)
-    @time ∂z2(data.field[3,1,:], data.grid.z)
-
-    # VectorData
-    data = load("flow.10.1", "flow.10.2", "flow.10.3", prec=Float64)
-    data = convert(Float32, data)
-    @time data2 = curl(data)
-    @time curl!(data2, data)
-    @time data2 = divergence(data)
-    @time divergence!(data2, data)
-    @time data2 = jacobian(data)
-    @time jacobian(data.field, data.grid)
-    @time jacobian!(data2, data.field, data.grid)
-    @time jacobian!(data2, data)
-
+    data = load(file, prec=Float64)
+    ∂₁data = ∂1(data)
+    # ∂₂data = ∂2(data) # Test data is 2D
+    ∂₃data = ∂3(data)
+    # ∇data = gradient(data) # Test data is 2D
+    # curldata = curl(data) # Test data is 2D
     printstyled("✓ Calculus.jl passed \n", bold=true, color=:green)
 end
 

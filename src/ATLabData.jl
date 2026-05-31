@@ -5,6 +5,8 @@ module ATLabData
 
 using Reexport
 
+@reexport using ArrayCalculus
+
 include("DataStructures.jl")
 @reexport using .DataStructures
 
@@ -13,12 +15,6 @@ include("IO.jl")
 
 include("Basics.jl")
 @reexport using .Basics
-
-# include("Analysis.jl")
-# @reexport using .Analysis
-
-include("FDM.jl")
-using .FDM
 
 include("Calculus.jl")
 @reexport using .Calculus
