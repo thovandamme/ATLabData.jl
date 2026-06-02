@@ -4,7 +4,6 @@ Module to load and process data from ATLab in Julia.
 module ATLabData
 
 using Reexport
-
 @reexport using ArrayCalculus
 
 include("DataStructures.jl")

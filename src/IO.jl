@@ -55,9 +55,9 @@ load(
     file::String, plane::Int, var::Symbol; prec::Type=Float32, 
     vars::Dict=Dict(:u=>1, :v=>2, :w=>3, :b=>4, :p=>5), verbose::Bool=true
 ) = _PlaneData_from_raw(file, plane, var, prec, vars, verbose)
-# load(
-#     file::String; zmin::Real, zmax::Real, verbose::Bool=true, prec::Type=Float32
-# )::ScalarData = _ScalarData_from_file(file)
+load(
+    file::String, zmin::Real, zmax::Real; verbose::Bool=true, prec::Type=Float32
+)::ScalarData = _ScalarData_from_file(file, zmin, zmax, prec, verbose)
 
 """
     load!(data, file)
@@ -163,13 +163,29 @@ end
 """
     Loading data that is stored in a single file.
 """
-function _ScalarData_from_file(fieldfile::String, type::Type, verbose::Bool)::ScalarData
+function _ScalarData_from_file(
+        fieldfile::String, type::Type, verbose::Bool
+    )::ScalarData
     do_verbose(verbose, "ScalarData", fieldfile)
     filename = split(fieldfile, "/")[end]
     if startswith(filename, "flow.") || startswith(filename, "scal.")
         return _ScalarData_from_raw(fieldfile, type)
     else
         return _ScalarData_from_visuals(fieldfile)
+    end
+end
+
+
+function _ScalarData_from_file(
+        fieldfile::String, zmin::Real, zmax::Real, type::Type, verbose::Bool
+    )::ScalarData
+    do_verbose(verbose, "ScalarData", fieldfile)
+    filename = split(fieldfile, "/")[end]
+    if startswith(filename, "flow.") || startswith(filename, "scal.")
+        return _ScalarData_from_raw(fieldfile, zmin, zmax, type)
+    else
+        # return _ScalarData_from_visuals(fieldfile, zmin, zmax)
+        error("Crop loading for visuals not available yet.")
     end
 end
 
@@ -183,6 +199,25 @@ function _ScalarData_from_raw(
         name = splitpath(fieldfile)[end],
         grid = grid,
         time = t,
+        field = buffer
+    )
+end
+
+
+function _ScalarData_from_raw(
+        fieldfile::String, zmin::Real, zmax::Real, T::Type
+    )::ScalarData{T, Int32}
+    grid = convert(T, _Grid_from_file(dirname(fieldfile)))
+    buffer, h = _Array_from_rawfile(grid, fieldfile, zmin, zmax)
+    kmin = argmin(abs.(grid.z .- zmin))
+    kmax = argmin(abs.(grid.z .- zmax))
+    grid.z = grid.z[kmin:kmax]
+    grid.nz = length(grid.z)
+    grid.scalez = grid.z[end] - grid.z[1]
+    return ScalarData(
+        name = splitpath(fieldfile)[end],
+        grid = grid,
+        time = convert(T, h.time),
         field = buffer
     )
 end
@@ -376,27 +411,25 @@ end
 function _Array_from_rawfile(
         grid::Grid{T,I}, fieldfile::String,
         zmin::Real, zmax::Real
-    )::Array{T, 3} where {T<:AbstractFloat, I<:Signed}
+    )::Tuple{Array{T,3}, FieldHeader} where {T<:AbstractFloat, I<:Signed}
     io = open(fieldfile, "r")
     h = _fieldheader(io)
     kmin = argmin(abs.(grid.z .- zmin))
-    println(grid.z[kmin])
     kmax = argmin(abs.(grid.z .- zmax))
-    println(grid.z[kmax])
-    nz = kmax- kmin
+    nz = kmax - (kmin-1)
     buffer = Vector{T}(undef, Int(grid.nx)*Int(grid.ny)*Int(nz))
-    startbyte = h.headersize + Int(kmin)*Int(grid.nx)*Int(grid.ny)
-    # endbyte = h.headersize + Int(kmax)*Int(nx)*Int(ny)
+    xy_planebytes = Int(grid.nx)*Int(grid.ny)*sizeof(T)
+    startbyte = h.headersize + xy_planebytes*(Int(kmin-1))
     seek(io, startbyte)
     read!(io, buffer)
     close(io)
-    return reshape(buffer, (grid.nx, grid.ny, nz))
+    return reshape(buffer, (grid.nx, grid.ny, nz)), h
 end
 
 
 function _Array_from_rawfile_(
         io::IOStream, h::FieldHeader{T,I}
-    )::Array{T, 3} where {T<:AbstractFloat, I<:Signed}
+    )::Array{T,3} where {T<:AbstractFloat, I<:Signed}
     buffer = Vector{T}(undef, Int(h.nx)*Int(h.ny)*Int(h.nz))
     seek(io, h.headersize)
     read!(io, buffer)
