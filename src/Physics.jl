@@ -1,7 +1,7 @@
 module Physics
 
 using Polyester, LoopVectorization
-using ..DataStructures, ..IO, ..Basics, ..Statistics, ..Calculus
+using ..DataStructures, ..IO, ..Basics, ..Statistics, ..ArrayCalculus
 
 export kinenergy, kinenergy!
 export Reynolds_stress_tensor, Reynolds_stress_tensor!
@@ -10,6 +10,14 @@ export dissipation_tensor, dissipation_tensor!
 export production_rate!, production_rate
 export vorticity!, vorticity
 export buoyancy_flux!
+export triple_velocity_correlation_vector!, triple_velocity_correlation_vector
+export triple_velocity_correlation_transport!, triple_velocity_correlation_transport
+export pressure_veclocity_corrrelation_vector!, pressure_veclocity_corrrelation_vector
+# export pressure_veclocity_corrrelation_transport!, pressure_veclocity_corrrelation_transport
+export visc_stress_work_vector!, visc_stress_work_vector
+export visc_stress_work_transport!, visc_stress_work_transport
+export turbulent_flux_vector!, turbulent_flux_vector
+export turbulent_transport!, turbulent_transport
 
 
 function do_verbose(field::String)
@@ -448,6 +456,220 @@ function buoyancy_flux!(
     return nothing
 end
 
+
+################################################################################
+#                       Turbulent transport / flux
+################################################################################
+
+# ∂ⱼTⱼ = ∂₃T₃ (mean in flux vector is over index 1 and 2, hence ∂₁T₁=∂₂T₂=0)
+function turbulent_transport!(
+        res::AbstractVector{T}, 
+        u::AbstractArray{T,4}, ∇u::AbstractArray{T,5}, 
+        Re::Real, ρ₀::Real, z::AbstractVector{T}
+    ) where {T<:AbstractFloat}
+    Tⱼ = turbulent_flux_vector(u, ∇u, Re, ρ₀)
+    res .= ∂1(view(Tⱼ, 3, :), z)
+    # @turbo for k ∈ eachindex(res)
+    #     @inbounds res[k] = ∂₁T₁[k] + ∂₂T₂[k] + ∂₃T₃[k]
+    # end
+    return nothing
+end
+
+
+function turbulent_transport(
+        u::AbstractArray{T,4}, ∇u::AbstractArray{T,5}, 
+        Re::Real, ρ₀::Real, z::AbstractVector{T}
+    )::Vector{T} where {T<:AbstractFloat}
+    res = Vector{T}(undef, size(u)[end])
+    turbulent_transport!(res, u, ∇u, Re, ρ₀, z)
+    return res
+end
+
+
+# Tⱼ = ρ₀⟨uⱼ(uᵢ)²/2⟩ + ⟨puⱼ⟩ + ⟨τᵢⱼuᵢ⟩
+function turbulent_flux_vector!(
+        res::AbstractArray{T,2}, 
+        u::AbstractArray{T,4}, ∇u::AbstractArray{T,5}, Re::Real, ρ₀::Real
+    ) where {T<:AbstractFloat}
+    buffer = similar(res)
+    triple_velocity_correlation_vector!(res, ρ₀, u)
+    # pressure_veclocity_corrrelation_vector!(buffer, p, u)
+    # res .+= buffer
+    visc_stress_work_vector!(buffer, ∇u, u, Re)
+    res .+= buffer
+    return nothing
+end
+
+
+function turbulent_flux_vector(
+        u::AbstractArray{T,4}, ∇u::AbstractArray{T,5}, Re::Real, ρ₀::Real
+    )::Array{T,2} where {T<:AbstractFloat}
+    nv = size(u)[1]; nz = size(u)[end]
+    res = Array{T,2}(undef, nv ,nz)
+    turbulent_flux_vector!(res, u, ∇u, Re, ρ₀)
+    return res
+end
+
+
+# ρ₀⟨uⱼ(uᵢ)²/2⟩
+function triple_velocity_correlation_vector!(
+        res::AbstractArray{T, 2}, ρ₀::Real, u::AbstractArray{T, 4}
+    ) where {T<:AbstractFloat}
+    nv, nx, ny, nz = size(u)
+    @inbounds @batch for k ∈ 1:nz
+        for h ∈ 1:nv
+            acc = zero(T) # Mean over i and j
+            for j ∈ 1:ny
+                for i ∈ 1:nx
+                    acc2 = zero(T)
+                    for g ∈ 1:nv
+                        acc2 += u[g,i,j,k]*u[g,i,j,k]
+                    end
+                    acc += acc2/2*u[h,i,j,k]
+                end
+            end
+            res[h,k] = ρ₀*acc/T(nx*ny)
+        end
+    end
+    return nothing
+end
+
+
+function triple_velocity_correlation_vector(
+        ρ₀::Real, u::AbstractArray{T, 4}
+    )::Array{T,2} where {T<:AbstractFloat}
+    nv, nx, ny, nz = size(u)
+    res = Array{T,2}(undef, nv, nz)
+    triple_velocity_correlation_vector!(res, ρ₀, u)
+    return res
+end
+
+
+# ∂ⱼ(ρ₀⟨uⱼ(uᵢ)²/2⟩)
+function triple_velocity_correlation_transport!(
+        res::AbstractVector{T}, ρ₀::Real, u::AbstractArray{T,4},
+        x::AbstractVector{T}, y::AbstractVector{T}, z::AbstractVector{T} 
+    ) where {T<:AbstractFloat}
+    nv = size(u)[1]; nz = size(res)[1]
+    vec = Array{T,2}(undef, nv, nz)
+    triple_velocity_correlation_vector!(vec, ρ₀, u)
+    res .= ∂1(view(vec, 3, :), z)
+    return nothing
+end
+
+
+function triple_velocity_correlation_transport(
+        ρ₀::Real, u::AbstractArray{T,4},
+        x::AbstractVector{T}, y::AbstractVector{T}, z::AbstractVector{T} 
+    )::Vector{T} where {T<:AbstractFloat}
+    res = Vector{T}(undef, length(z))
+    triple_velocity_correlation_transport!(res, ρ₀, u, x, y, z)
+    return res
+end
+
+
+# ⟨puⱼ⟩
+function pressure_veclocity_corrrelation_vector!(
+        res::AbstractArray{T, 2}, p::AbstractArray{T,3}, u::AbstractArray{T,4}
+    ) where {T<:AbstractFloat}
+    nv, nx, ny, nz = size(u)
+    @inbounds @batch for k ∈ 1:nz
+        for h ∈ 1:nv
+            acc = zero(T) # Mean over i and j
+            for j ∈ 1:ny
+                for i ∈ 1:nx
+                    acc += p[i,j,k]*u[h,i,j,k]
+                end
+            end
+            res[h,k] = acc/(nx*ny)
+        end
+    end
+    return nothing
+end
+
+
+function pressure_veclocity_corrrelation_vector(
+        p::AbstractArray{T,3}, u::AbstractArray{T,4}
+    ) where {T<:AbstractFloat}
+    nv, nx, ny, nz = size(u)
+    res = Array{T,2}(2, nv, nz)
+    pressure_veclocity_corrrelation_vector!(res, p, u)
+    return res
+end
+
+
+# ⟨τᵢⱼuᵢ⟩ = ⟨μ(∇u + ∇uᵀ)ᵢⱼuᵢ⟩ = ⟨μ(∇uᵢⱼ+∇uⱼᵢ)uᵢ⟩
+function visc_stress_work_vector!(
+        res::AbstractArray{T,2}, 
+        ∇u::AbstractArray{T,5}, u::AbstractArray{T,4}, Re::Real
+    ) where {T<:AbstractFloat}
+    nv, nx, ny, nz = size(∇u[1,:,:,:,:])
+    @inbounds @batch for k ∈ 1:nz
+        for h ∈ 1:nv
+            acc = zero(T) # accumulator for the mean
+            for j ∈ 1:ny
+                for i ∈ 1:nx
+                    acc2 = zero(T) # accumulator for the contraction
+                    for g ∈ 1:nv
+                        acc2 += (∇u[g,h,i,j,k] + ∇u[h,g,i,j,k])*u[g,i,j,k]
+                    end
+                    acc += acc2
+                end
+            end
+            res[h,k] = -Re^(-1)*acc/(nx*ny)
+        end
+    end
+    return nothing
+end
+
+
+function visc_stress_work_vector(
+        ∇u::AbstractArray{T,5}, u::AbstractArray{T,4}, Re::Real
+    )::AbstractArray{T,2} where {T<:AbstractFloat}
+    res = Array{T,2}(undef, size(u)[1], size(u)[4])
+    visc_stress_work_vector!(res, ∇u, u, Re)
+    return res
+end
+
+
+# ∂ⱼ⟨τᵢⱼuᵢ⟩ = ∂₃⟨τᵢ₃uᵢ⟩₁₂
+function visc_stress_work_transport!(
+        res::AbstractArray{T,1},
+        ∇u::AbstractArray{T,5}, u::AbstractArray{T,4}, Re::Real,
+        z::AbstractVector{T}
+    ) where {T<:AbstractFloat}
+    vec = visc_stress_work_vector(∇u, u, Re)
+    res .= ∂1(view(vec, 3, :), z)
+    return nothing
+end
+
+
+function visc_stress_work_transport(
+        ∇u::AbstractArray{T,5}, u::AbstractArray{T,4}, Re::Real,
+        z::AbstractVector{T}
+    )::Vector{T} where {T<:AbstractFloat}
+    res = Vector{T}(undef, size(u)[end])
+    visc_stress_work_transport!(res, ∇u, u, Re, z)
+    return res
+end
+
+
+# τᵢⱼ
+function deviatoric_stress_tensor!(
+        res::AbstractArray{T,3}, ∇u::AbstractArray{T,5}, Re::Real
+    ) where {T<:AbstractFloat}
+    nv, nx, ny, nz = size(∇u[1,:,:,:,:])
+    @inbounds @batch for k ∈ 1:nz
+        for j ∈ 1:ny
+            for i ∈ 1:nx
+                for h ∈ 1:nv, g ∈ 1:nv
+                    res[g,h,i,j,k] = Re^(-1)*(∇u[g,h,i,j,k] + ∇[h,g,i,j,k])
+                end
+            end
+        end
+    end
+    return nothing
+end
 
 
 end
