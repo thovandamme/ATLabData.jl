@@ -368,11 +368,36 @@ end
 function production_rate!(
         res::AbstractArray{T,1}, R::AbstractArray{T,3}, ∇u::AbstractArray{T,5}
     ) where {T<:AbstractFloat}
+    @inbounds @batch for k ∈ 1:nz
+        acc = zero(T)
+        for h ∈ 1:nv
+            for g ∈ 1:nv
+                acc2 = zero(T)
+                pointer1 = view(∇u, g, h, :, :, k)
+                pointer2 = view(∇u, h, g, :, :, k)
+                @turbo for j ∈ 1:ny
+                    for i ∈ 1:nx
+                        @inbounds acc2 += 0.5*(pointer1[i,j] + pointer2[i,j])
+                    end
+                end
+                # S[g,h,k] = acc2/(nx*ny)
+                acc = R[g,h,k]*acc2/(nx*ny)
+            end
+        end
+        res[k] = -acc
+    end
+    return nothing
+end
+
+
+function production_rate!(
+        res::AbstractArray{T,1}, R::AbstractArray{T,3}, ∇u::AbstractArray{T,5}
+    ) where {T<:AbstractFloat}
     # ∇u has to be the jacobian of the total velcoity field
     # ⟨sᵢⱼ⟩(z) with i=h and j=g (sᵢⱼ from the total field, not only fluctuations)
     S = similar(R) # ⟨sᵢⱼ⟩(z)
     nv, nx, ny, nz = size(∇u)[2:end]
-    println("Calculating ⟨sᵢⱼ⟩(z).")
+    # println("Calculating ⟨sᵢⱼ⟩(z).")
     @inbounds @batch for k ∈ 1:nz
         for h ∈ 1:nv
             for g ∈ 1:nv
