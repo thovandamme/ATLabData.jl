@@ -58,6 +58,10 @@ load(
 load(
     file::String, zmin::Real, zmax::Real; verbose::Bool=true, prec::Type=Float32
 )::ScalarData = _ScalarData_from_file(file, zmin, zmax, prec, verbose)
+load(
+    xfile::String, yfile::String, zfile::String, zmin::Real, zmax::Real;
+    prec::Type=Float32, verbose::Bool=true
+)::VectorData = _VectorData_from_files(xfile, yfile, zfile, zmin,zmax, prec, verbose)
 
 """
     load!(data, file)
@@ -298,6 +302,24 @@ function _VectorData_from_files(
 end
 
 
+function _VectorData_from_files(
+        xfieldfile::String,
+        yfieldfile::String,
+        zfieldfile::String,
+        zmin::Real, zmax::Real,
+        prec::Type,
+        verbose::Bool
+    )::VectorData
+    do_verbose(verbose, "VectorData", xfieldfile, yfieldfile, zfieldfile)
+    filename = split(xfieldfile, "/")[end]
+    if startswith(filename, "flow.") || startswith(filename, "scal.")
+        return _VectorData_from_raw(xfieldfile, yfieldfile, zfieldfile, zmin, zmax, prec)
+    else
+        error("Loading crop for visuals not available yet.")
+    end
+end
+
+
 function _VectorData_from_raw(
         xfieldfile::String,
         yfieldfile::String,
@@ -313,6 +335,37 @@ function _VectorData_from_raw(
         name = string(splitpath(xfieldfile)[end][1:end-2]),
         grid = grid,
         time = t,
+        field = field
+    )
+end
+
+
+function _VectorData_from_raw(
+        xfieldfile::String,
+        yfieldfile::String,
+        zfieldfile::String,
+        zmin::Real, zmax::Real,
+        T::Type
+    )::VectorData{T, Int32}
+    grid = convert(T,_Grid_from_file(dirname(xfieldfile)))
+    kmin = argmin(abs.(grid.z .- zmin))
+    kmax = argmin(abs.(grid.z .- zmax))
+    z = grid.z[kmin:kmax]
+    nz = length(z)
+    scalez = z[end] - z[1]
+    field = Array{T}(undef, 3, grid.nx, grid.ny, nz)
+    h = header(xfieldfile)
+    field[1,:,:,:] .= _Array_from_rawfile(grid, xfieldfile, zmin, zmax)[1]
+    field[2,:,:,:] .= _Array_from_rawfile(grid, yfieldfile, zmin, zmax)[1]
+    field[3,:,:,:] .= _Array_from_rawfile(grid, zfieldfile, zmin, zmax)[1]
+    return VectorData(
+        name = string(splitpath(xfieldfile)[end][1:end-2]),
+        grid = Grid(
+            grid.nx, grid.ny, convert(eltype(grid.nx), nz), 
+            grid.scalex, grid.scaley, scalez,
+            grid.x, grid.y, z
+        ),
+        time = convert(T, h.time),
         field = field
     )
 end
