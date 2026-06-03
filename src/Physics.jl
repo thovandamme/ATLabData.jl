@@ -185,7 +185,7 @@ end
 function Reynolds_stress_tensor!(
         res::Array{T,3}, field::AbstractArray{T,4}; verbose=true
     ) where {T<:AbstractFloat}
-    verbose && do_verbose("Rᵢⱼ")
+    # verbose && do_verbose("Rᵢⱼ")
     nv, nx, ny, nz = size(field)
     fill!(res, zero(T))
     @inbounds @batch for k ∈ 1:nz
@@ -229,7 +229,7 @@ function dissipation_tensor!(
     ) where {T<:AbstractFloat}
     # ∇u is the jacobian of the vector-valued velocity
     # NOTE: @turbo leads here to much more allocations and longer running time
-    verbose && do_verbose("εᵢⱼ")
+    # verbose && do_verbose("εᵢⱼ")
     nv, nx, ny, nz = size(∇u[1,:,:,:,:])
     @inbounds @batch for k ∈ 1:nz
         for h ∈ 1:nv
@@ -277,7 +277,7 @@ end
 function dissipation_rate!(
         res::AbstractArray{T,1}, E::AbstractArray{T,3}; verbose=true
     ) where {T<:AbstractFloat}
-    verbose && do_verbose("ε")
+    # verbose && do_verbose("ε")
     for k ∈ eachindex(res)
         res[k] = 0.5*(E[1,1,k] + E[2,2,k] + E[3,3,k])
     end
@@ -290,7 +290,7 @@ function dissipation_rate!(
     ) where {T<:AbstractFloat}
     # This is much more efficient than utilizing the dissipation as above
     # However, if εᵢⱼ is calculated anyway, above is better
-    verbose && do_verbose("ε")
+    # verbose && do_verbose("ε")
     nv, nx, ny, nz = size(∇u)[2:end]
     @inbounds @batch for k ∈ 1:nz
         acc = zero(T)
@@ -346,6 +346,29 @@ end
 ################################################################################
 #                           Turbulence shear production
 ################################################################################
+function strain_rate_tensor!(
+        res::AbstractArray{T,3}, ∇u::AbstractArray{T,5}
+    ) where {T<:AbstractFloat}
+    nv, nx, ny, nz = size(∇u)[2:end]
+    @inbounds @batch for k ∈ 1:nz
+        for h ∈ 1:nv
+            for g ∈ 1:nv
+                acc = zero(T)
+                pointer1 = view(∇u, g, h, :, :, k)
+                pointer2 = view(∇u, h, g, :, :, k)
+                @turbo for j ∈ 1:ny
+                    for i ∈ 1:nx
+                        @inbounds acc += 0.5*(pointer1[i,j] + pointer2[i,j])
+                    end
+                end
+                res[g,h,k] = acc/(nx*ny)
+            end
+        end
+    end
+    return nothing
+end
+
+
 function production_tensor!()
     return nothing
 end
@@ -629,11 +652,11 @@ function visc_stress_work_vector!(
         res::AbstractArray{T,2}, 
         ∇u::AbstractArray{T,5}, u::AbstractArray{T,4}, Re::Real
     ) where {T<:AbstractFloat}
-    nv, nx, ny, nz = size(∇u[1,:,:,:,:])
+    nv, nx, ny, nz = size(u)
     @inbounds @batch for k ∈ 1:nz
         for h ∈ 1:nv
             acc = zero(T) # accumulator for the mean
-            for j ∈ 1:ny
+            for j ∈ 1:ny # NOTE: @turbo slows down here
                 for i ∈ 1:nx
                     acc2 = zero(T) # accumulator for the contraction
                     for g ∈ 1:nv
