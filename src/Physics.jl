@@ -368,6 +368,7 @@ end
 function production_rate!(
         res::AbstractArray{T,1}, R::AbstractArray{T,3}, ∇u::AbstractArray{T,5}
     ) where {T<:AbstractFloat}
+    nv, nx, ny, nz = size(∇u)[2:end]
     @inbounds @batch for k ∈ 1:nz
         acc = zero(T)
         for h ∈ 1:nv
